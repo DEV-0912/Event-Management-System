@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const base = import.meta.env.VITE_API_BASE || 'https://events.vjstartup.com/ef-be'
+// If VITE_API_BASE is set (e.g., https://events.vjstartup.com), use it.
+// Otherwise default to the current origin so requests like '/api/...'
+// go to `${origin}/api/...` without duplicating '/api'.
+const base = import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : '')
 export const api = axios.create({ baseURL: base })
 
 api.interceptors.request.use((config) => {

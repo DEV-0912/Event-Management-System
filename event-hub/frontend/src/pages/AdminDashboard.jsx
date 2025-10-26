@@ -3252,7 +3252,7 @@ export default function AdminDashboard() {
         enforced: Number(ev.regCapEnforced || 0) === 1,
         cap: Number(ev.regCap || 0)
       }
-      await api.post(`/api/events/${ev.id}/capacity`, {
+      await api.post(`/api/events/${ev.id}/reg-cap`, {
         enforced: form.enforced,
         cap: form.cap
       })
