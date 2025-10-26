@@ -51,252 +51,315 @@
 //       )}
 //     </div>
 //   )
-// }
 
-
-import { useEffect, useState } from 'react'
-import { api } from '../api'
-
-export default function UserDashboard() {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
-  const [expandedCard, setExpandedCard] = useState(null)
-
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      setMessage('Please login to view your events.')
-      setLoading(false)
-      return
-    }
-    ;(async () => {
-      try {
-        const { data } = await api.get('/api/registration/mine')
-        setItems(data || [])
-      } catch (e) {
-        setMessage('Failed to load your registrations')
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [])
-
-  const toggleCardExpansion = (id) => {
-    setExpandedCard(expandedCard === id ? null : id)
-  }
-
-  const downloadQR = (qrCode, eventName) => {
-    if (!qrCode) return
+//   const downloadQR = (qrCode, eventName) => {
+//     if (!qrCode) return
     
-    const link = document.createElement('a')
-    link.href = qrCode
-    link.download = `${eventName.replace(/\s+/g, '_')}_QR.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+//     const link = document.createElement('a')
+//     link.href = qrCode
+//     link.download = `${eventName.replace(/\s+/g, '_')}_QR.png`
+//     document.body.appendChild(link)
+//     link.click()
+//     document.body.removeChild(link)
+//   }
 
-  const user = JSON.parse(localStorage.getItem('auth_user') || '{}')
+//   const user = JSON.parse(localStorage.getItem('auth_user') || '{}')
 
-  return (
-    <div className="container">
-      <div className="dashboard-header">
-        <div className="user-welcome">
-          <h1>My Events</h1>
-          <div className="user-greeting">
-            Welcome back, <span className="user-name">{user.name || 'User'}</span>
-          </div>
-        </div>
-        <div className="stats-overview">
-          <div className="stat-item">
-            <div className="stat-value">{items.length}</div>
-            <div className="stat-label">Total Events</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-value">
-              {items.filter(r => r.checkedIn).length}
-            </div>
-            <div className="stat-label">Attended</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-value">
-              {items.filter(r => !r.checkedIn).length}
-            </div>
-            <div className="stat-label">Upcoming</div>
-          </div>
-        </div>
-      </div>
+//   // countdown tick
+//   useEffect(() => {
+//     const t = setInterval(() => {
+//       setQrState(prev => {
+//         const next = { ...prev }
+//         const now = Date.now()
+//         Object.keys(next).forEach(k => {
+//           const entry = next[k]
+//           if (!entry) return
+//           const remainingMs = Math.max(0, (entry.expiresAt || 0) - now)
+//           const sec = Math.ceil(remainingMs / 1000)
+//           if (remainingMs <= 0) {
+//             // expire and clear QR image
+//             next[k] = { ...entry, url: '', countdown: 0 }
+//           } else {
+//             next[k] = { ...entry, countdown: sec }
+//           }
+//         })
+//         return next
+//       })
+//     }, 300)
+//     return () => clearInterval(t)
+//   }, [])
 
-      {message && (
-        <div className={`alert ${message.includes('login') ? 'alert-warning' : 'alert-error'} fade-in`}>
-          <div className="alert-content">
-            <span>{message}</span>
-            <button className="alert-close" onClick={() => setMessage('')}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+//   const generateQr = async (reg) => {
+//     const id = reg.id
+//     try {
+//       setQrBusy(prev => ({ ...prev, [id]: true }))
+//       const { data } = await api.post(`/api/registration/${id}/generate-qr`)
+//       const { dataUrl, expiresAt, remaining, limit } = data || {}
+//       if (!dataUrl || !expiresAt) {
+//         setMessage('QR generation failed')
+//         return
+//       }
+//       setQrState(prev => ({
+//         ...prev,
+//         [id]: { url: dataUrl, expiresAt, remaining, limit, countdown: Math.ceil((expiresAt - Date.now())/1000) }
+//       }))
+//     } catch (e) {
+//       const status = e?.response?.status
+//       const err = e?.response?.data?.error || 'QR generation failed'
+//       if (status === 403 && /disabled/i.test(err)) {
+//         setMessage('QR generation is disabled by the admin for this event')
+//       } else if (status === 429) {
+//         setMessage('QR attempts limit reached')
+//       } else {
+//         setMessage(err)
+//       }
+//     } finally {
+//       setQrBusy(prev => ({ ...prev, [id]: false }))
+//     }
+//   }
 
-      {loading ? (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading your events...</p>
-        </div>
-      ) : (
-        <div className="events-section">
-          {items.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
-                  <path d="M8 6H20C21.1 6 22 6.9 22 8V16C22 17.1 21.1 18 20 18H8C6.9 18 6 17.1 6 16V8C6 6.9 6.9 6 8 6Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M16 18V20C16 21.1 15.1 22 14 22H6C4.9 22 4 21.1 4 20V12C4 10.9 4.9 10 6 10H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h3>No events registered yet</h3>
-              <p>Get started by browsing and registering for events</p>
-              <button 
-                className="browse-events-btn primary-btn"
-                onClick={() => window.location.href = '/register'}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M10 12H6M6 12L9 9M6 12L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M4 5H18C19.1046 5 20 5.89543 20 7V17C20 18.1046 19.1046 19 18 19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Browse Events
-              </button>
-            </div>
-          ) : (
-            <div className="events-grid">
-              {items.map(r => {
-                const isExpanded = expandedCard === r.id
-                const eventDate = new Date(r.eventDate)
-                const isPastEvent = eventDate < new Date()
+//   return (
+//     <div className="container">
+//       <div className="dashboard-header">
+//         <div className="user-welcome">
+//           <h1>My Events</h1>
+//           <div className="user-greeting">
+//             Welcome back, <span className="user-name">{user.name || 'User'}</span>
+//           </div>
+//         </div>
+//         <div className="stats-overview">
+//           <div className="stat-item">
+//             <div className="stat-value">{items.length}</div>
+//             <div className="stat-label">Total Events</div>
+//           </div>
+//           <div className="stat-item">
+//             <div className="stat-value">
+//               {items.filter(r => r.checkedIn).length}
+//             </div>
+//             <div className="stat-label">Attended</div>
+//           </div>
+//           <div className="stat-item">
+//             <div className="stat-value">
+//               {items.filter(r => !r.checkedIn).length}
+//             </div>
+//             <div className="stat-label">Upcoming</div>
+//           </div>
+//         </div>
+//       </div>
+
+//       {message && (
+//         <div className={`alert ${message.includes('login') ? 'alert-warning' : 'alert-error'} fade-in`}>
+//           <div className="alert-content">
+//             <span>{message}</span>
+//             <button className="alert-close" onClick={() => setMessage('')}>
+//               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+//                 <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+//               </svg>
+//             </button>
+//           </div>
+//         </div>
+//       )}
+
+//       {loading ? (
+//         <div className="loading-container">
+//           <div className="loading-spinner"></div>
+//           <p>Loading your events...</p>
+//         </div>
+//       ) : (
+//         <div className="events-section">
+//           {items.length === 0 ? (
+//             <div className="empty-state">
+//               <div className="empty-icon">
+//                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
+//                   <path d="M8 6H20C21.1 6 22 6.9 22 8V16C22 17.1 21.1 18 20 18H8C6.9 18 6 17.1 6 16V8C6 6.9 6.9 6 8 6Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                   <path d="M16 18V20C16 21.1 15.1 22 14 22H6C4.9 22 4 21.1 4 20V12C4 10.9 4.9 10 6 10H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                 </svg>
+//               </div>
+//               <h3>No events registered yet</h3>
+//               <p>Get started by browsing and registering for events</p>
+//               <button 
+//                 className="browse-events-btn primary-btn"
+//                 onClick={() => window.location.href = '/register'}
+//               >
+//                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+//                   <path d="M10 12H6M6 12L9 9M6 12L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                   <path d="M4 5H18C19.1046 5 20 5.89543 20 7V17C20 18.1046 19.1046 19 18 19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                 </svg>
+//                 Browse Events
+//               </button>
+//             </div>
+//           ) : (
+//             <div className="events-grid">
+//               {items.map(r => {
+//                 const isExpanded = expandedCard === r.id
+//                 const eventDate = new Date(r.eventDate)
+//                 const isPastEvent = eventDate < new Date()
                 
-                return (
-                  <div 
-                    key={r.id} 
-                    className={`event-card ${isExpanded ? 'expanded' : ''} ${isPastEvent ? 'past-event' : ''}`}
-                  >
-                    <div className="event-header">
-                      <div className="event-title-section">
-                        <h3 className="event-name">{r.eventName}</h3>
-                        <div className="event-meta">
-                          <span className="event-date">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                            </svg>
-                            {eventDate.toLocaleString()}
-                          </span>
-                          <span className={`status-badge ${r.checkedIn ? 'checked-in' : 'not-checked-in'}`}>
-                            {r.checkedIn ? (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                                Checked In
-                              </>
-                            ) : isPastEvent ? (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                                Missed
-                              </>
-                            ) : (
-                              <>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                                </svg>
-                                Upcoming
-                              </>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                      <button 
-                        className="expand-btn"
-                        onClick={() => toggleCardExpansion(r.id)}
-                        aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-                      >
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 24 24" 
-                          fill="none"
-                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
-                        >
-                          <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
+//                 return (
+//                   <div 
+//                     key={r.id} 
+//                     className={`event-card ${isExpanded ? 'expanded' : ''} ${isPastEvent ? 'past-event' : ''}`}
+//                   >
+//                     <div className="event-header">
+//                       <div className="event-title-section">
+//                         <h3 className="event-name">{r.eventName}</h3>
+//                         <div className="event-meta">
+//                           <span className="event-date">
+//                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+//                               <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                             </svg>
+//                             {eventDate.toLocaleString()}
+//                           </span>
+//                           <span className={`status-badge ${r.checkedIn ? 'checked-in' : 'not-checked-in'}`}>
+//                             {r.checkedIn ? (
+//                               <>
+//                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+//                                   <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                                 </svg>
+//                                 Checked In
+//                               </>
+//                             ) : isPastEvent ? (
+//                               <>
+//                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+//                                   <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                                 </svg>
+//                                 Missed
+//                               </>
+//                             ) : (
+//                               <>
+//                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+//                                   <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+//                                 </svg>
+//                                 Upcoming
+//                               </>
+//                             )}
+//                           </span>
+//                         </div>
+//                       </div>
+//                       <button 
+//                         className="expand-btn"
+//                         onClick={() => toggleCardExpansion(r.id)}
+//                         aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+//                       >
+//                         <svg 
+//                           width="20" 
+//                           height="20" 
+//                           viewBox="0 0 24 24" 
+//                           fill="none"
+//                           style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
+//                         >
+//                           <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                         </svg>
+//                       </button>
+//                     </div>
 
-                    <div className="event-details">
-                      <div className="detail-item">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <path d="M17.657 16.657L13.414 20.9C13.039 21.2746 12.5306 21.485 12 21.485C11.4694 21.485 10.961 21.2746 10.586 20.9L6.343 16.657C5.22422 15.5381 4.46234 14.1127 4.15369 12.5608C3.84504 11.009 4.00349 9.40047 4.60901 7.93868C5.21452 6.4769 6.2399 5.22749 7.55548 4.34846C8.87107 3.46943 10.4178 3.00024 12 3.00024C13.5822 3.00024 15.1289 3.46943 16.4445 4.34846C17.7601 5.22749 18.7855 6.4769 19.391 7.93868C19.9965 9.40047 20.155 11.009 19.8463 12.5608C19.5377 14.1127 18.7758 15.5381 17.657 16.657Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M15 11C15 12.6569 13.6569 14 12 14C10.3431 14 9 12.6569 9 11C9 9.34315 10.3431 8 12 8C13.6569 8 15 9.34315 15 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>{r.eventVenue}</span>
-                      </div>
-                      {r.eventSpeaker && (
-                        <div className="detail-item">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span>{r.eventSpeaker}</span>
-                        </div>
-                      )}
-                      {r.eventFood && (
-                        <div className="detail-item">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 10H21M7 15H17M6 15V19C6 20.1046 6.89543 21 8 21H16C17.1046 21 18 20.1046 18 19V15M9 5C9 3.34315 10.3431 2 12 2C13.6569 2 15 3.34315 15 5V7H9V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span>{r.eventFood}</span>
-                        </div>
-                      )}
-                    </div>
+//                     <div className="event-details">
+//                       <div className="detail-item">
+//                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+//                           <path d="M17.657 16.657L13.414 20.9C13.039 21.2746 12.5306 21.485 12 21.485C11.4694 21.485 10.961 21.2746 10.586 20.9L6.343 16.657C5.22422 15.5381 4.46234 14.1127 4.15369 12.5608C3.84504 11.009 4.00349 9.40047 4.60901 7.93868C5.21452 6.4769 6.2399 5.22749 7.55548 4.34846C8.87107 3.46943 10.4178 3.00024 12 3.00024C13.5822 3.00024 15.1289 3.46943 16.4445 4.34846C17.7601 5.22749 18.7855 6.4769 19.391 7.93868C19.9965 9.40047 20.155 11.009 19.8463 12.5608C19.5377 14.1127 18.7758 15.5381 17.657 16.657Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                           <path d="M15 11C15 12.6569 13.6569 14 12 14C10.3431 14 9 12.6569 9 11C9 9.34315 10.3431 8 12 8C13.6569 8 15 9.34315 15 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                         </svg>
+//                         <span>{r.eventVenue}</span>
+//                       </div>
+//                       {r.eventSpeaker && (
+//                         <div className="detail-item">
+//                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+//                             <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                           </svg>
+//                           <span>{r.eventSpeaker}</span>
+//                         </div>
+//                       )}
+//                       {r.eventFood && (
+//                         <div className="detail-item">
+//                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+//                             <path d="M3 10H21M7 15H17M6 15V19C6 20.1046 6.89543 21 8 21H16C17.1046 21 18 20.1046 18 19V15M9 5C9 3.34315 10.3431 2 12 2C13.6569 2 15 3.34315 15 5V7H9V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                           </svg>
+//                           <span>{r.eventFood}</span>
+//                         </div>
+//                       )}
+//                     </div>
 
-                    {/* Expanded Content */}
-                    {isExpanded && (
-                      <div className="expanded-content">
-                        <div className="qr-section">
-                          <h4>Your QR Code</h4>
-                          <p>Show this QR code at the event for quick check-in</p>
-                          {r.qrCode ? (
-                            <div className="qr-container">
-                              <img src={r.qrCode} alt="QR Code for event check-in" className="qr-image" />
-                              <div className="qr-actions">
-                                <button 
-                                  className="download-btn"
-                                  onClick={() => downloadQR(r.qrCode, r.eventName)}
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 10L12 15M12 15L7 10M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                  Download QR
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="no-qr-message">
-                              <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                                <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                              <p>QR code not available</p>
-                            </div>
-                          )}
-                        </div>
+//                     {/* Expanded Content */}
+//                     {isExpanded && (
+//                       <div className="expanded-content">
+//                         <div className="qr-section">
+//                           <h4>Your QR Code</h4>
+//                           <p>QR is valid for 10 seconds. You have limited attempts.</p>
+//                           <div className="qr-container">
+//                             {!!qrState[r.id]?.url ? (
+//                               <>
+//                                 <img src={qrState[r.id].url} alt="QR Code for event check-in" className="qr-image" />
+//                                 <div className="qr-actions" style={{alignItems:'center'}}>
+//                                   <span style={{color:'var(--muted)'}}>Expires in {Math.max(0, qrState[r.id].countdown || 0)}s</span>
+//                                   {Number.isFinite(qrState[r.id]?.remaining) && Number.isFinite(qrState[r.id]?.limit) && (
+//                                     <span style={{color:'var(--muted)'}}>Attempts left: {qrState[r.id].remaining} / {qrState[r.id].limit}</span>
+//                                   )}
+//                                 </div>
+//                               </>
+//                             ) : (
+//                               <>
+//                                 <div className="no-qr-message">
+//                                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+//                                     <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+//                                   </svg>
+//                                   <p>Generate a QR when you are near the check-in desk. It will be valid for 10 seconds.</p>
+//                                 </div>
+//                                 <div className="qr-actions">
+//                                   <button 
+//                                     className="download-btn"
+//                                     onClick={() => generateQr(r)}
+//                                     disabled={!!qrBusy[r.id]}
+//                                     title="Generate a short-lived QR for check-in"
+//                                   >
+//                                     {qrBusy[r.id] ? 'Generating…' : 'Generate QR'}
+//                                   </button>
+//                                 </div>
+//                               </>
+//                             )}
+//                           </div>
+//                         </div>
 
-                        <div className="event-notes">
-                          <h4>Event Information</h4>
-                          <div className="notes-grid">
-                            <div className="note-item">
+//                         <div className="event-notes">
+//                           <h4>Event Information</h4>
+//                           <div className="notes-grid">
+//                             <div className="note-item">
+//                               <strong>Registration ID:</strong>
+//                               <span className="mono">{r.id}</span>
+//                             </div>
+//                             <div className="note-item">
+//                               <strong>Check-in Status:</strong>
+//                               <span className={r.checkedIn ? 'status-success' : 'status-pending'}>
+//                                 {r.checkedIn ? 'Checked In' : 'Not Checked In'}
+//                               </span>
+//                             </div>
+//                             <div className="note-item">
+//                               <strong>Event Date:</strong>
+//                               <span>{eventDate.toLocaleDateString('en-US', { 
+//                                 weekday: 'long',
+//                                 year: 'numeric',
+//                                 month: 'long',
+//                                 day: 'numeric'
+//                               })}</span>
+//                             </div>
+//                             <div className="note-item">
+//                               <strong>Event Time:</strong>
+//                               <span>{eventDate.toLocaleTimeString('en-US', {
+//                                 hour: '2-digit',
+//                                 minute: '2-digit'
+//                               })}</span>
+//                             </div>
+//                           </div>
+//                         </div>
+//                       </div>
+//                     )}
+//                   </div>
+//                 )
+//               })}
+//             </div>
+//           )}
+//         </div>
+//       )}
                               <strong>Registration ID:</strong>
                               <span className="mono">{r.id}</span>
                             </div>
