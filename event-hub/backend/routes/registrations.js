@@ -1,25 +1,11 @@
-    // If a Bearer token is present, block staff from registering
-    try {
-      const header = req.headers.authorization || ''
-      const token = header.startsWith('Bearer ') ? header.slice(7) : ''
-      if (token) {
-        const secret = process.env.JWT_SECRET || 'supersecretkey'
-        const payload = jwt.verify(token, secret)
-        const role = payload?.user?.role || payload?.role
-        if (role === 'admin' || role === 'superadmin') {
-          return res.status(403).json({ error: 'Admins cannot register for events' })
-        }
-      }
-    } catch {}
-
-// import express from 'express';
+import express from 'express';
+import QRCode from 'qrcode';
+import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
-// import QRCode from 'qrcode';
-// import nodemailer from 'nodemailer';
-// import { allAsync, getAsync, runAsync } from '../db.js';
-// import { authMiddleware, isAdmin } from '../utils/auth.js';
-
-// const router = express.Router();
+import { allAsync, getAsync, runAsync } from '../db.js';
+import { authMiddleware, isAdmin } from '../utils/auth.js';
+import { getDeptCodeFromEmail, getDeptCodeFromRoll } from '../utils/department.js';
+import crypto from 'crypto';
 
 // function dataURLToBuffer(dataUrl) {
 //   try {
@@ -247,16 +233,6 @@ async function ensureQrAllowanceColumn() {
 // });
 
 // export default router;
-
-
-import express from 'express';
-import QRCode from 'qrcode';
-import nodemailer from 'nodemailer';
-import jwt from 'jsonwebtoken';
-import { allAsync, getAsync, runAsync } from '../db.js';
-import { authMiddleware, isAdmin } from '../utils/auth.js';
-import { getDeptCodeFromEmail, getDeptCodeFromRoll } from '../utils/department.js';
-import crypto from 'crypto';
 
 const router = express.Router();
 
