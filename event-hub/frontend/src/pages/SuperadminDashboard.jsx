@@ -79,6 +79,10 @@ export default function SuperadminDashboard() {
       ])
       setEvents(Array.isArray(all.data) ? all.data : [])
       setPerAdminStats(Array.isArray(perAdmin.data) ? perAdmin.data : [])
+    } catch (e) {
+      // Backend may not be updated in this environment; avoid throwing in UI
+      setEvents([])
+      setPerAdminStats([])
     } finally {
       setLoading(false)
     }
@@ -358,7 +362,7 @@ export default function SuperadminDashboard() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .superadmin-dashboard {
           max-width: 1200px;
           margin: 0 auto;
