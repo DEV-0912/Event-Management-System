@@ -92,17 +92,16 @@ export default function EventForm() {
     } catch {}
   }
 
-  const downloadRegistrationLink = () => {
-    if (!registrationLink) return
-    const blob = new Blob([registrationLink + '\n'], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+  const qrImgUrl = createdEvent ? `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(registrationLink)}` : ''
+
+  const downloadQrImage = () => {
+    if (!qrImgUrl) return
     const a = document.createElement('a')
-    a.href = url
-    a.download = `${(createdEvent?.name || 'event').replace(/[^a-z0-9-_]+/gi, '-')}-registration-link.txt`
+    a.href = qrImgUrl
+    a.download = `${(createdEvent?.name || 'event').replace(/[^a-z0-9-_]+/gi, '-')}-registration-qr.png`
     document.body.appendChild(a)
     a.click()
     a.remove()
-    URL.revokeObjectURL(url)
   }
 
   const uploadPosterNow = async () => {
@@ -371,14 +370,17 @@ export default function EventForm() {
             </div>
             <div className="custom-fields">
               <div className="add-field-form">
-                <h3>Share Registration Link</h3>
-                <p style={{margin:'6px 0 12px', color:'var(--muted)'}}>Copy or download this link to share with others.</p>
-                <div style={{display:'grid', gap:8}}>
-                  <input className="form-input" readOnly value={registrationLink} />
-                  <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                    <button type="button" className="primary-btn" onClick={copyRegistrationLink}>Copy/Share</button>
-                    <button type="button" className="primary-btn" onClick={downloadRegistrationLink}>Download Link</button>
+                <h3>Share Registration</h3>
+                <p style={{margin:'6px 0 12px', color:'var(--muted)'}}>Scan or share the QR code, or copy the link below.</p>
+                <div style={{display:'grid', gap:12, justifyItems:'center'}}>
+                  <div style={{background:'white', padding:12, borderRadius:12, border:'1px solid var(--border)'}}>
+                    {qrImgUrl && <img src={qrImgUrl} alt="Registration QR" style={{width:220, height:220}} />}
                   </div>
+                  <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                    <button type="button" className="primary-btn" onClick={downloadQrImage}>Download QR</button>
+                    <button type="button" className="primary-btn" onClick={copyRegistrationLink}>Copy/Share Link</button>
+                  </div>
+                  <input className="form-input" readOnly value={registrationLink} />
                 </div>
               </div>
 
