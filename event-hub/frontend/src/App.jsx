@@ -1,6 +1,7 @@
 // // import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 // // no local nav state needed
-// // import AdminDashboard from './pages/AdminDashboard.jsx'
+// // import AdminDashboard from './pages/AdminDashboard'
+import SuperadminDashboard from './pages/SuperadminDashboard.jsx'
 // // import AdsManager from './pages/AdsManager.jsx'
 // // import EventForm from './pages/EventForm.jsx'
 // // import RegistrationForm from './pages/RegistrationForm.jsx'
@@ -23,157 +24,10 @@
 // //   const token = localStorage.getItem('auth_token')
 // //   if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />
 // //   let user = null
-// //   try { user = JSON.parse(localStorage.getItem('auth_user') || 'null') } catch {}
-// //   if (user?.role !== 'admin') return <Navigate to="/me" replace />
-// //   return children
-// // }
-
-// // export default function App() {
-// //   const navigate = useNavigate()
-// //   const user = (() => {
-// //     try {
-// //       return JSON.parse(localStorage.getItem('auth_user') || 'null')
-// //     } catch {
-// //       return null
-// //     }
-// //   })()
-
-// //   const isAuthed = !!localStorage.getItem('auth_token')
-// //   const isAdmin = user?.role === 'admin'
-
-// //   const onLogout = () => {
-// //     localStorage.removeItem('auth_token')
-// //     localStorage.removeItem('auth_user')
-// //     navigate('/login', { replace: true })
-// //   }
-
-// //   return (
-// //     <>
-// //       <ul className="background" style={{zIndex:0}}>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //         <li></li>
-// //       </ul>
-// //       <div className="container">
-// //       <nav className="nav">
-// //         <div className="nav-left">
-// //           <Link to="/">Home</Link>
-// //           {!isAuthed && <Link to="/login">Login</Link>}
-// //           {isAuthed && (
-// //             <>
-// //               {isAdmin && <Link to="/admin">Admin</Link>}
-// //               {isAdmin && <Link to="/new">Create Event</Link>}
-// //               {!isAdmin && <Link to="/register">Register</Link>}
-// //               {isAdmin && <Link to="/checkin">Check-In</Link>}
-// //               {isAdmin && <Link to="/ads">Ads</Link>}
-// //               {!isAdmin && <Link to="/me">My Events</Link>}
-// //             </>
-// //           )}
-// //         </div>
-// //         {isAuthed && user && (
-// //           <div className="user-badge">
-// //             <img
-// //               className="avatar"
-// //               src={user.picture || ''}
-// //               alt={user.name || user.email || 'user'}
-// //               onError={e => { e.currentTarget.style.display = 'none' }}
-// //             />
-// //             <div className="user-meta">
-// //               <div className="user-name">{user.name}</div>
-// //               <div className="user-email">{user.email}</div>
-// //             </div>
-// //             <button className="icon-btn" onClick={onLogout} title="Logout" aria-label="Logout">
-// //               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-// //                 <path d="M16 17l5-5-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-// //                 <path d="M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-// //                 <path d="M12 19a7 7 0 110-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-// //               </svg>
-// //             </button>
-// //           </div>
-// //         )}
-// //       </nav>
-// //       <Routes>
-// //         <Route path="/" element={<Home />} />
-// //         <Route
-// //           path="/admin"
-// //           element={
-// //             <RequireAdmin>
-// //               <AdminDashboard />
-// //             </RequireAdmin>
-// //           }
-// //         />
-// //         <Route
-// //           path="/new"
-// //           element={
-// //             <RequireAdmin>
-// //               <EventForm />
-// //             </RequireAdmin>
-// //           }
-// //         />
-// //         <Route
-// //           path="/register"
-// //           element={
-// //             <RequireAuth>
-// //               <RegistrationForm />
-// //             </RequireAuth>
-// //           }
-// //         />
-// //         <Route
-// //           path="/checkin"
-// //           element={
-// //             <RequireAdmin>
-// //               <CheckIn />
-// //             </RequireAdmin>
-// //           }
-// //         />
-// //         <Route
-// //           path="/ads"
-// //           element={
-// //             <RequireAdmin>
-// //               <AdsManager />
-// //             </RequireAdmin>
-// //           }
-// //         />
-// //         <Route path="/login" element={<Login />} />
-// //         <Route
-// //           path="/me"
-// //           element={
-// //             <RequireAuth>
-// //               <UserDashboard />
+// // //   try { user = JSON.parse(localStorage.getItem('auth_user') || 'null') } catch {}
+// // //   if (user?.role !== 'admin') return <Navigate to="/me" replace />
+// // //   return children
+// // // }
 // //             </RequireAuth>
 // //           }
 // //         />
@@ -281,7 +135,7 @@ export default function App() {
                   <>
                     {isStaff ? (
                       <>
-                        <Link to="/admin" className={getNavLinkClass('/admin')}>
+                        <Link to={isSuper ? "/superadmin" : "/admin"} className={getNavLinkClass(isSuper ? '/superadmin' : '/admin')}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                             <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             <path d="M19.4 15C19.2663 15.9333 19.1333 16.8667 19 17.8C18.8333 18.6667 18.6667 19.5333 18.5 20.4C18.3667 21.0667 17.9333 21.5333 17.3333 21.8C16.6 22.0667 15.8667 22.3333 15.1333 22.6C14.4 22.8667 13.6667 23.1333 12.9333 23.4C12.3333 23.6 11.6667 23.6 11.0667 23.4C10.3333 23.1333 9.6 22.8667 8.86667 22.6C8.13333 22.3333 7.4 22.0667 6.66667 21.8C6.06667 21.5333 5.63333 21.0667 5.5 20.4C5.33333 19.5333 5.16667 18.6667 5 17.8C4.86667 16.8667 4.73333 15.9333 4.6 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

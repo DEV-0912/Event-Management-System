@@ -58,61 +58,6 @@
 //       ) : (
 //         <div className="cards">
 //           {events.map(ev => (
-//             <div className="card" key={ev.id}>
-//               <div className="card-head">
-//                 <div className="card-title">{ev.name}</div>
-//                 <div className="muted">#{ev.id} • {ev.date} • {ev.venue}</div>
-//                 <div className="muted">Creator: {ev.createdBy || 'Unassigned'}</div>
-//                 <div className="muted">Status: {Number(ev.archived) ? 'Archived' : 'Active'}</div>
-//               </div>
-//               <div className="card-actions">
-//                 <button disabled={!!busy[ev.id]} onClick={() => toggleQr(ev.id, !Number(ev.qrEnabled))}>
-//                   {Number(ev.qrEnabled) ? 'Disable QR' : 'Enable QR'}
-//                 </button>
-//                 <button disabled={!!busy[ev.id]} onClick={() => resetAll(ev.id)}>Reset Attempts</button>
-//                 <button disabled={!!busy['logs_'+ev.id]} onClick={() => loadLogs(ev.id)}>View Logs</button>
-//               </div>
-//               {Array.isArray(logsByEvent[ev.id]) && logsByEvent[ev.id].length > 0 && (
-//                 <div className="logs">
-//                   {logsByEvent[ev.id].slice(0, 50).map(l => (
-//                     <div className="log" key={l.id}>
-//                       <div className="log-line">
-//                         <span className={`pill ${l.status}`}>{l.status}</span>
-//                         <span className="muted">{l.detail}</span>
-//                         <span className="muted">reg:{l.regId}</span>
-//                         <span className="muted">{l.userEmail}</span>
-//                         <span className="muted">{l.createdAt}</span>
-//                       </div>
-//                     </div>
-//                   ))}
-//                 </div>
-//               )}
-//             </div>
-//           ))}
-//         </div>
-//       )}
-//       <style jsx>{`
-//         .page-wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
-//         .title { font-size: 22px; font-weight: 700; margin: 8px 0 16px; }
-//         .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-//         .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); }
-//         .card-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
-//         .card-title { font-weight: 700; }
-//         .muted { color: var(--muted); font-size: 12px; margin-right: 6px; }
-//         .card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-//         button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; background: var(--button-bg, #fff); }
-//         button:disabled { opacity: .6; cursor: not-allowed; }
-//         .logs { max-height: 240px; overflow: auto; padding-top: 6px; border-top: 1px dashed var(--border); }
-//         .log-line { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 4px 0; }
-//         .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); font-size: 11px; }
-//         .pill.generated { background: rgba(34,197,94,.12); color: #16a34a; border-color: rgba(34,197,94,.3); }
-//         .pill.denied { background: rgba(239,68,68,.12); color: #ef4444; border-color: rgba(239,68,68,.3); }
-//       `}</style>
-//     </div>
-//   )
-// }
-
-
 import { useEffect, useState } from 'react'
 import { api } from '@/api'
 
@@ -123,12 +68,17 @@ export default function SuperadminDashboard() {
   const [logsByEvent, setLogsByEvent] = useState({})
   const [regsByEvent, setRegsByEvent] = useState({})
   const [expandedSections, setExpandedSections] = useState({})
+  const [perAdminStats, setPerAdminStats] = useState([])
 
   const fetchEvents = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/api/events')
-      setEvents(Array.isArray(data) ? data : [])
+      const [all, perAdmin] = await Promise.all([
+        api.get('/api/events/all'),
+        api.get('/api/events/overview/all')
+      ])
+      setEvents(Array.isArray(all.data) ? all.data : [])
+      setPerAdminStats(Array.isArray(perAdmin.data) ? perAdmin.data : [])
     } finally {
       setLoading(false)
     }
