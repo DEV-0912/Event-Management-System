@@ -2038,7 +2038,7 @@ export default function AdminDashboard() {
                           <span>Loading registrants...</span>
                         </div>
                       ) : (
-                        <>
+                        <div>
                           {(!regsByEvent[ev.id] || regsByEvent[ev.id].length === 0) ? (
                             <div className="empty-registrations">
                               <p>No registrations yet.</p>
@@ -2210,7 +2210,7 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                             </div>
-                          </>
+                          </div>
                         )}
                       </div>
                     )}
