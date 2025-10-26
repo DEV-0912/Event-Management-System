@@ -250,6 +250,14 @@ export default function App() {
               }
             />
             <Route
+              path="/superadmin"
+              element={
+                <RequireAdmin>
+                  <SuperadminDashboard />
+                </RequireAdmin>
+              }
+            />
+            <Route
               path="/new"
               element={
                 <RequireAdmin>
