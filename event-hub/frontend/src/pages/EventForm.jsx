@@ -133,12 +133,19 @@ export default function EventForm() {
     e.preventDefault()
     setLoading(true)
     try {
-      const formSchema = fields.map((f, idx) => ({ 
+      let formSchema = fields.map((f, idx) => ({ 
         id: idx + 1, 
         label: f.label.trim(), 
         type: f.type, 
-        options: f.options?.length ? f.options : undefined 
+        options: f.options?.length ? f.options : undefined,
+        required: !!f.required
       }))
+
+      const hasRoll = formSchema.some(f => /roll/i.test(String(f.label||'')))
+      const hasPayment = formSchema.some(f => /payment/i.test(String(f.label||'')))
+      if (!hasRoll) formSchema.push({ id: formSchema.length + 1, label: 'Roll Number', type: 'text', required: true })
+      if (!hasPayment) formSchema.push({ id: formSchema.length + 1, label: 'Payment ID', type: 'text', required: true })
+
       await api.post('/api/events', { ...form, formSchema, poster })
       setMessage('Event created successfully!')
       // Reset form

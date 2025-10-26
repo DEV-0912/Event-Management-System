@@ -566,11 +566,16 @@ router.post('/:id/generate-qr', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Fetch event (ensure exists); no toggle enforcement
+    // Fetch event (ensure exists); enforce QR enable toggle
+    try { await runAsync("ALTER TABLE events ADD COLUMN regQrEnabled INTEGER DEFAULT 0"); } catch (e) { /* ignore if exists */ }
     const ev = await getAsync('SELECT * FROM events WHERE id = ?', [reg.eventId]);
     if (!ev) {
       await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'event_not_found']);
       return res.status(404).json({ error: 'Event not found' });
+    }
+    if (Number(ev.regQrEnabled || 0) !== 1) {
+      await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'qr_disabled']);
+      return res.status(403).json({ error: 'QR generation disabled by admin' });
     }
 
     const currentCount = Number(reg.qrCount || 0);

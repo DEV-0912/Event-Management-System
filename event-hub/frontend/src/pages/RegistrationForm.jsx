@@ -283,20 +283,25 @@ export default function RegistrationForm() {
     (async () => {
       try {
         setEventsLoading(true)
-        // Parallel API calls for faster loading
-        const [eventsRes, adsRes] = await Promise.all([
-          api.get('/api/events'),
-          api.get('/api/ads')
-        ])
-        setEvents(eventsRes.data)
-        setAds(Array.isArray(adsRes.data) ? adsRes.data : [])
+        if (isAdmin) {
+          const eventsRes = await api.get('/api/events')
+          setEvents(eventsRes.data)
+          setAds([])
+        } else {
+          const [eventsRes, adsRes] = await Promise.all([
+            api.get('/api/events'),
+            api.get('/api/ads')
+          ])
+          setEvents(eventsRes.data)
+          setAds(Array.isArray(adsRes.data) ? adsRes.data : [])
+        }
       } catch {
         setMessage('Failed to load events')
       } finally {
         setEventsLoading(false)
       }
     })()
-  }, [])
+  }, [isAdmin])
 
   // If route contains an event ID, preselect it and open the modal when events are loaded
   useEffect(() => {
@@ -491,7 +496,7 @@ export default function RegistrationForm() {
       )}
 
       {/* Advertisements Carousel */}
-      {ads.length > 0 && (
+      {!isAdmin && ads.length > 0 && (
         <div className="ad-carousel">
           <div className="ad-header">
             <span className="ad-label">Sponsored</span>

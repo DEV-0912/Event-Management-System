@@ -21,6 +21,64 @@ router.get('/all', authMiddleware, isSuperAdmin, async (_req, res) => {
   }
 });
 
+// Admin: toggle registration open/closed for an event
+// POST /api/events/:id/reg-toggle  Body: { closed: boolean }
+router.post('/:id/reg-toggle', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+
+    // Add column if missing
+    try { await runAsync("ALTER TABLE events ADD COLUMN regClosed INTEGER DEFAULT 0"); } catch {}
+
+    const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+    const ev = rows[0];
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+
+    const me = (req.user?.email || '').toLowerCase();
+    const role = req.user?.role;
+    if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const closed = req.body?.closed === true || String(req.body?.closed) === 'true' ? 1 : 0;
+    await runAsync('UPDATE events SET regClosed = ? WHERE id = ?', [closed, id]);
+    res.json({ success: true, regClosed: closed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: set or clear registration capacity for an event
+// POST /api/events/:id/reg-cap  Body: { enforced: boolean, cap: number }
+router.post('/:id/reg-cap', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+
+    // Add columns if missing
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0"); } catch {}
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCap INTEGER DEFAULT 0"); } catch {}
+
+    const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+    const ev = rows[0];
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+
+    const me = (req.user?.email || '').toLowerCase();
+    const role = req.user?.role;
+    if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const enforced = req.body?.enforced === true || String(req.body?.enforced) === 'true' ? 1 : 0;
+    const capNum = Math.max(0, Number(req.body?.cap || 0)) | 0;
+    await runAsync('UPDATE events SET regCapEnforced = ?, regCap = ? WHERE id = ?', [enforced, capNum, id]);
+    res.json({ success: true, regCapEnforced: enforced, regCap: capNum });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Superadmin: per-admin overview stats
 router.get('/overview/all', authMiddleware, isSuperAdmin, async (_req, res) => {
   try {
@@ -86,6 +144,16 @@ router.post('/:id/claim', authMiddleware, isAdmin, async (req, res) => {
       'INSERT INTO events (name, date, venue, speaker, food, formSchema, poster, createdBy, description) VALUES (?,?,?,?,?,?,?,?,?)',
       [name, date, venue, speaker || '', food || '', schemaArr.length ? JSON.stringify(schemaArr) : null, poster || null, createdBy, description || null]
     );
+    // Optionally set registration capacity at creation
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0"); } catch {}
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCap INTEGER DEFAULT 0"); } catch {}
+    if (req.body) {
+      const enforced = req.body?.regCapEnforced === true || String(req.body?.regCapEnforced) === 'true' ? 1 : 0;
+      const capNum = Math.max(0, Number(req.body?.regCap || 0)) | 0;
+      if (enforced || capNum > 0) {
+        await runAsync('UPDATE events SET regCapEnforced = ?, regCap = ? WHERE id = ?', [enforced, capNum, result.id]);
+      }
+    }
     const created = await allAsync('SELECT * FROM events WHERE id = ?', [result.id]);
     res.status(201).json(created[0]);
   } catch (err) {

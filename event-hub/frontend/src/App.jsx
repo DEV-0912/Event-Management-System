@@ -289,18 +289,22 @@ export default function App() {
                           </svg>
                           <span className="nav-text">Dashboard</span>
                         </Link>
-                        <Link to="/new" className={getNavLinkClass('/new')}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span className="nav-text">Create Event</span>
-                        </Link>
-                        <Link to="/checkin" className={getNavLinkClass('/checkin')}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 10V14M10 12H14M6 12H4.8C4.32261 12 3.86477 12.1896 3.52721 12.5272C3.18964 12.8648 3 13.3226 3 13.8V19.2C3 19.6774 3.18964 20.1352 3.52721 20.4728C3.86477 20.8104 4.32261 21 4.8 21H19.2C19.6774 21 20.1352 20.8104 20.4728 20.4728C20.8104 20.1352 21 19.6774 21 19.2V13.8C21 13.3226 20.8104 12.8648 20.4728 12.5272C20.1352 12.1896 19.6774 12 19.2 12H18M15 7C15 8.65685 13.6569 10 12 10C10.3431 10 9 8.65685 9 7C9 5.34315 10.3431 4 12 4C13.6569 4 15 5.34315 15 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span className="nav-text">Check-In</span>
-                        </Link>
+                        {isSuper && (
+                          <>
+                            <Link to="/new" className={getNavLinkClass('/new')}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              <span className="nav-text">Create Event</span>
+                            </Link>
+                            <Link to="/checkin" className={getNavLinkClass('/checkin')}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 10V14M10 12H14M6 12H4.8C4.32261 12 3.86477 12.1896 3.52721 12.5272C3.18964 12.8648 3 13.3226 3 13.8V19.2C3 19.6774 3.18964 20.1352 3.52721 20.4728C3.86477 20.8104 4.32261 21 4.8 21H19.2C19.6774 21 20.1352 20.8104 20.4728 20.4728C20.8104 20.1352 21 19.6774 21 19.2V13.8C21 13.3226 20.8104 12.8648 20.4728 12.5272C20.1352 12.1896 19.6774 12 19.2 12H18M15 7C15 8.65685 13.6569 10 12 10C10.3431 10 9 8.65685 9 7C9 5.34315 10.3431 4 12 4C13.6569 4 15 5.34315 15 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              <span className="nav-text">Check-In</span>
+                            </Link>
+                          </>
+                        )}
                         {isSuper && (
                           <Link to="/ads" className={getNavLinkClass('/ads')}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
