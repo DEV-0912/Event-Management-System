@@ -1534,6 +1534,8 @@ export default function AdminDashboard() {
   const [deletingId, setDeletingId] = useState(null)
   const [expandedAnswers, setExpandedAnswers] = useState(new Set())
   const [departmentFilters, setDepartmentFilters] = useState({})
+  const user = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
+  const isSuper = user?.role === 'superadmin'
 
   const DEPT_MAP = {
     '66': 'AIML',
@@ -1563,12 +1565,30 @@ export default function AdminDashboard() {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/api/events/mine')
-      setEvents(data)
-      const ov = await api.get('/api/events/overview')
-      setOverview(ov.data || { totalEvents: 0, totalRegistrations: 0, totalCheckedIn: 0 })
-      const u = await api.get('/api/events/unowned')
-      setUnowned(u.data || [])
+      if (isSuper) {
+        const [all, perAdmin] = await Promise.all([
+          api.get('/api/events/all'),
+          api.get('/api/events/overview/all')
+        ])
+        setEvents(all.data || [])
+        // Aggregate totals for header cards
+        const rows = Array.isArray(perAdmin.data) ? perAdmin.data : []
+        const totals = rows.reduce((acc, r) => {
+          acc.totalEvents += Number(r.totalEvents || 0)
+          acc.totalRegistrations += Number(r.totalRegistrations || 0)
+          acc.totalCheckedIn += Number(r.totalCheckedIn || 0)
+          return acc
+        }, { totalEvents: 0, totalRegistrations: 0, totalCheckedIn: 0 })
+        setOverview(totals)
+        setUnowned([])
+      } else {
+        const { data } = await api.get('/api/events/mine')
+        setEvents(data)
+        const ov = await api.get('/api/events/overview')
+        setOverview(ov.data || { totalEvents: 0, totalRegistrations: 0, totalCheckedIn: 0 })
+        const u = await api.get('/api/events/unowned')
+        setUnowned(u.data || [])
+      }
     } catch (e) {
       setMessage('Failed to load events')
     } finally {
@@ -1599,6 +1619,17 @@ export default function AdminDashboard() {
       setMessage('Delete failed')
     } finally { 
       setDeletingId(null) 
+    }
+  }
+
+  const toggleRegistration = async (ev) => {
+    try {
+      const nextClosed = Number(ev.regClosed || 0) === 1 ? false : true
+      await api.post(`/api/events/${ev.id}/reg-toggle`, { closed: nextClosed })
+      setMessage(nextClosed ? 'Registrations closed' : 'Registrations opened')
+      await load()
+    } catch (e) {
+      setMessage('Failed to toggle registrations')
     }
   }
 
@@ -1687,7 +1718,7 @@ export default function AdminDashboard() {
       )}
 
       <div className="dashboard-header">
-        <h1>Admin Dashboard</h1>
+        <h1>{isSuper ? 'Super Admin Dashboard' : 'Admin Dashboard'}</h1>
         <div className="user-info">
           <span className="user-label">Signed in as:</span>
           <span className="user-name">
@@ -1828,6 +1859,15 @@ export default function AdminDashboard() {
                   <div className="event-header">
                     <h3 className="event-name">{ev.name}</h3>
                     <div className="event-actions">
+                      {isSuper && (
+                        <button 
+                          className="toggle-regs-btn"
+                          onClick={() => toggleRegistration(ev)}
+                          title={Number(ev.regClosed || 0) === 1 ? 'Open registrations' : 'Close registrations'}
+                        >
+                          {Number(ev.regClosed || 0) === 1 ? 'Open Reg' : 'Close Reg'}
+                        </button>
+                      )}
                       <button 
                         className="toggle-regs-btn" 
                         onClick={() => toggleRegs(ev.id)}
@@ -1880,6 +1920,12 @@ export default function AdminDashboard() {
                       <span className="detail-label">Venue:</span>
                       <span className="detail-value">{ev.venue}</span>
                     </div>
+                    {isSuper && ev.createdBy && (
+                      <div className="detail-item">
+                        <span className="detail-label">Created By:</span>
+                        <span className="detail-value">{ev.createdBy}</span>
+                      </div>
+                    )}
                     {ev.speaker && (
                       <div className="detail-item">
                         <span className="detail-label">Speaker:</span>

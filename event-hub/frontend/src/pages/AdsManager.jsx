@@ -427,7 +427,7 @@ export default function AdsManager() {
         </>
       )}
 
-      <style jsx>{`
+      <style>
         .dashboard-header {
           margin-bottom: 24px;
         }
@@ -949,7 +949,7 @@ export default function AdsManager() {
             justify-content: center;
           }
         }
-      `}</style>
+      </style>
     </div>
   )
 }
