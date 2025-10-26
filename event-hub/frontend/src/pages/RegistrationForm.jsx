@@ -909,6 +909,17 @@ export default function RegistrationForm() {
                                 }}
                               />
                             </label>
+                            {(() => {
+                              const v = answers[f.label]
+                              if (!v || !(v.dataUrl || typeof v === 'string')) return null
+                              const src = typeof v === 'string' ? v : v.dataUrl
+                              return (
+                                <div style={{marginTop:8, display:'flex', alignItems:'center', gap:10}}>
+                                  <img src={src} alt={f.label} style={{maxHeight:80, border:'1px solid var(--border)', borderRadius:8}} />
+                                  <span style={{fontSize:12, color:'var(--muted)'}}>{typeof v === 'string' ? '' : v.name}</span>
+                                </div>
+                              )
+                            })()}
                           </div>
                         )}
                         {f.type === 'file' && (
@@ -918,6 +929,7 @@ export default function RegistrationForm() {
                               <input 
                                 type="file" 
                                 className="form-input"
+                                accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                 onChange={e => {
                                   const file = e.target.files?.[0]
                                   if (!file) { setAnswer(f.label, ''); return }
@@ -927,6 +939,45 @@ export default function RegistrationForm() {
                                 }}
                               />
                             </label>
+                            {(() => {
+                              const v = answers[f.label]
+                              if (!v || !(v.dataUrl || typeof v === 'string')) return null
+                              return (
+                                <div style={{marginTop:8, display:'flex', alignItems:'center', gap:10}}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  <span style={{fontSize:12, color:'var(--muted)'}}>{typeof v === 'string' ? '' : v.name}</span>
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )}
+                        {f.type === 'ppt' && (
+                          <div className="form-group">
+                            <label className="form-label">
+                              {f.label}{f.required ? ' *' : ''}
+                              <input 
+                                type="file" 
+                                className="form-input"
+                                accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) { setAnswer(f.label, ''); return }
+                                  const reader = new FileReader()
+                                  reader.onload = () => setAnswer(f.label, { name: file.name, type: file.type, dataUrl: String(reader.result||'') })
+                                  reader.readAsDataURL(file)
+                                }}
+                              />
+                            </label>
+                            {(() => {
+                              const v = answers[f.label]
+                              if (!v || !(v.dataUrl || typeof v === 'string')) return null
+                              return (
+                                <div style={{marginTop:8, display:'flex', alignItems:'center', gap:10}}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  <span style={{fontSize:12, color:'var(--muted)'}}>{typeof v === 'string' ? '' : v.name}</span>
+                                </div>
+                              )
+                            })()}
                           </div>
                         )}
                       </div>
