@@ -7,7 +7,8 @@ import eventsRouter from './routes/events.js';
 import registrationsRouter from './routes/registrations.js';
 import authRouter from './routes/auth.js';
 import adsRouter from './routes/ads.js';
-import { initDb } from './db.js';
+import { initDb, allAsync, runAsync } from './db.js';
+import { authMiddleware, isAdmin } from './utils/auth.js';
 
 dotenv.config();
 
@@ -67,6 +68,81 @@ app.get('/api/health', (_req, res) => {
 app.get(`${API_PREFIX}/health`, (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Inline admin event routes to guarantee availability even if router wiring differs in deployment
+const mountAdminEventRoutes = (base) => {
+  // POST {base}/events/:id/qr-toggle  Body: { enabled: boolean }
+  app.post(`${base}/events/:id/qr-toggle`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid id' });
+      try { await runAsync("ALTER TABLE events ADD COLUMN regQrEnabled INTEGER DEFAULT 0"); } catch {}
+      const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+      const ev = rows[0];
+      if (!ev) return res.status(404).json({ error: 'Event not found' });
+      const me = (req.user?.email || '').toLowerCase();
+      const role = req.user?.role;
+      if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const enabled = req.body?.enabled === true || String(req.body?.enabled) === 'true' ? 1 : 0;
+      await runAsync('UPDATE events SET regQrEnabled = ? WHERE id = ?', [enabled, id]);
+      res.json({ success: true, regQrEnabled: enabled });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST {base}/events/:id/reg-toggle  Body: { closed: boolean }
+  app.post(`${base}/events/:id/reg-toggle`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid id' });
+      try { await runAsync("ALTER TABLE events ADD COLUMN regClosed INTEGER DEFAULT 0"); } catch {}
+      const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+      const ev = rows[0];
+      if (!ev) return res.status(404).json({ error: 'Event not found' });
+      const me = (req.user?.email || '').toLowerCase();
+      const role = req.user?.role;
+      if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const closed = req.body?.closed === true || String(req.body?.closed) === 'true' ? 1 : 0;
+      await runAsync('UPDATE events SET regClosed = ? WHERE id = ?', [closed, id]);
+      res.json({ success: true, regClosed: closed });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST {base}/events/:id/reg-cap  Body: { enforced: boolean, cap: number }
+  app.post(`${base}/events/:id/reg-cap`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid id' });
+      try { await runAsync("ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0"); } catch {}
+      try { await runAsync("ALTER TABLE events ADD COLUMN regCap INTEGER DEFAULT 0"); } catch {}
+      const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+      const ev = rows[0];
+      if (!ev) return res.status(404).json({ error: 'Event not found' });
+      const me = (req.user?.email || '').toLowerCase();
+      const role = req.user?.role;
+      if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const enforced = req.body?.enforced === true || String(req.body?.enforced) === 'true' ? 1 : 0;
+      const capNum = Math.max(0, Number(req.body?.cap || 0)) | 0;
+      await runAsync('UPDATE events SET regCapEnforced = ?, regCap = ? WHERE id = ?', [enforced, capNum, id]);
+      res.json({ success: true, regCapEnforced: enforced, regCap: capNum });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+};
+
+// Mount at legacy '/api' and, if applicable, at '{BASE_PATH}/api'
+mountAdminEventRoutes('/api');
+if (API_PREFIX !== '/api') mountAdminEventRoutes(API_PREFIX);
 
 // Mount routers under legacy '/api/*'
 app.use('/api/auth', authRouter);
