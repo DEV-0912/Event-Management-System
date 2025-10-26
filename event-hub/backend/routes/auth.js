@@ -16,6 +16,8 @@ router.post('/google', async (req, res) => {
     const oAuthClient = new OAuth2Client(GOOGLE_CLIENT_ID)
 
     const ticket = await oAuthClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID })
+    console.log('[AUTH] ticket', ticket)
+    console.log('[AUTH] payload', ticket.getPayload())
     const payload = ticket.getPayload()
     if (!payload || !payload.email) return res.status(401).json({ error: 'Invalid Google token' })
 
@@ -52,5 +54,38 @@ router.get('/me', (req, res) => {
     res.status(401).json({ error: 'Unauthorized' })
   }
 })
+
+
+export async function handleGoogleAuth(req, res) {
+  const { credential } = req.body
+  if (!credential) return res.status(400).send({ error: 'missing-credential' })
+
+  try {
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+    const ticket = await client.verifyIdToken({
+      idToken: credential,          // the ID token sent from frontend
+      audience: process.env.GOOGLE_CLIENT_ID,           // must match token's "aud"
+    })
+    const payload = ticket.getPayload()
+    const single = (process.env.ADMIN_EMAIL || '').toLowerCase()
+    const list = (process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
+    const emailLc = (payload.email || '').toLowerCase()
+    const isAdmin = (!!single && emailLc === single) || (list.length > 0 && list.includes(emailLc))
+    const user = {
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture,
+      role: isAdmin ? 'admin' : 'student'
+    }
+
+    const token = jwt.sign({ user }, JWT_SECRET, { expiresIn: '7d' })
+    console.log('[AUTH] success', { email: user.email, role: user.role })
+    res.status(200).send({ ok: true, payload })
+  } catch (err) {
+    console.error('[AUTH] error', err)
+    res.status(401).send({ error: 'invalid-id-token' })
+  }
+}
 
 export default router
