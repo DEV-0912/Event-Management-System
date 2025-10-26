@@ -2160,29 +2160,6 @@
 //                                             <div className="registrant-status">
 //                                               <span className={`status-badge ${r.checkedIn ? 'checked-in' : 'not-checked-in'}`}>
 //                                                 {r.checkedIn ? 'Checked In' : 'Not Checked In'}
-//                                               </span>
-//                                               <span className="dept-badge">
-//                                                 {dept.code || 'NA'} · {dept.name}
-//                                               </span>
-//                                             </div>
-//                                           </div>
-                                          
-//                                           {r.contact && (
-//                                             <div className="registrant-contact">
-//                                               <span className="contact-label">Contact:</span>
-//                                               <span className="contact-value">{r.contact}</span>
-//                                             </div>
-//                                           )}
-                                          
-//                                           {ans && (
-//                                             <div className="answers-section">
-//                                               <button 
-//                                                 className="toggle-answers-btn" 
-//                                                 onClick={() => toggleAnswers(r.id)}
-//                                               >
-//                                                 {isOpen ? (
-//                                                   <>
-//                                                     <span>Hide Answers</span>
 //                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
 //                                                       <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
 //                                                     </svg>
@@ -3357,6 +3334,16 @@ export default function AdminDashboard() {
       setSendTo(prev => ({ ...prev, [eventId]: '' }))
     } catch (e) {
       setMessage('Failed to send attendance list')
+    }
+  }
+
+  const grantQrAllowance = async (regId, eventId) => {
+    try {
+      await api.post(`/api/registration/${regId}/qr-grant`)
+      setMessage('Granted +2 QR attempts')
+      await reloadRegs(eventId)
+    } catch (e) {
+      setMessage(e?.response?.data?.error || 'Failed to grant QR allowance')
     }
   }
 
