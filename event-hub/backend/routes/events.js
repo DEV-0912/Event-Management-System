@@ -1,6 +1,6 @@
 import express from 'express';
 import { allAsync, runAsync } from '../db.js';
-import { authMiddleware, isAdmin } from '../utils/auth.js';
+import { authMiddleware, isAdmin, isSuperAdmin } from '../utils/auth.js';
 
 const router = express.Router();
 
@@ -10,6 +10,36 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
     const { name, date, venue, speaker, food, formSchema, poster, description } = req.body;
     if (!name || !date || !venue) {
       return res.status(400).json({ error: 'name, date and venue are required' });
+
+// Superadmin: list all events
+router.get('/all', authMiddleware, isSuperAdmin, async (_req, res) => {
+  try {
+    const events = await allAsync('SELECT * FROM events ORDER BY date DESC');
+    res.json(events);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Superadmin: per-admin overview stats
+router.get('/overview/all', authMiddleware, isSuperAdmin, async (_req, res) => {
+  try {
+    const rows = await allAsync(`
+      SELECT 
+        COALESCE(e.createdBy, '') as adminEmail,
+        COUNT(DISTINCT e.id) as totalEvents,
+        COUNT(r.id) as totalRegistrations,
+        SUM(CASE WHEN r.checkedIn = 1 THEN 1 ELSE 0 END) as totalCheckedIn
+      FROM events e
+      LEFT JOIN registrations r ON r.eventId = e.id
+      GROUP BY e.createdBy
+      ORDER BY totalEvents DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/events/unowned → list events without createdBy (legacy)
 router.get('/unowned', authMiddleware, isAdmin, async (_req, res) => {
@@ -40,10 +70,21 @@ router.post('/:id/claim', authMiddleware, isAdmin, async (req, res) => {
   }
 });
     }
+    // Ensure required registration fields: Roll Number and Payment ID
+    let schemaArr = [];
+    try {
+      if (Array.isArray(formSchema)) schemaArr = formSchema;
+      else if (typeof formSchema === 'string' && formSchema.trim()) schemaArr = JSON.parse(formSchema);
+    } catch {}
+    const hasRoll = schemaArr.some(f => /roll/i.test(String(f?.label||'')));
+    const hasPayment = schemaArr.some(f => /payment/i.test(String(f?.label||'')));
+    if (!hasRoll) schemaArr.push({ id: (schemaArr.length+1), label: 'Roll Number', type: 'text', required: true });
+    if (!hasPayment) schemaArr.push({ id: (schemaArr.length+1), label: 'Payment ID', type: 'text', required: true });
+
     const createdBy = req.user?.email || null;
     const result = await runAsync(
       'INSERT INTO events (name, date, venue, speaker, food, formSchema, poster, createdBy, description) VALUES (?,?,?,?,?,?,?,?,?)',
-      [name, date, venue, speaker || '', food || '', formSchema ? JSON.stringify(formSchema) : null, poster || null, createdBy, description || null]
+      [name, date, venue, speaker || '', food || '', schemaArr.length ? JSON.stringify(schemaArr) : null, poster || null, createdBy, description || null]
     );
     const created = await allAsync('SELECT * FROM events WHERE id = ?', [result.id]);
     res.status(201).json(created[0]);

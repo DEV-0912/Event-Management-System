@@ -230,7 +230,9 @@ export default function App() {
   })()
 
   const isAuthed = !!localStorage.getItem('auth_token')
+  const isSuper = user?.role === 'superadmin'
   const isAdmin = user?.role === 'admin'
+  const isStaff = isAdmin || isSuper
 
   const onLogout = () => {
     localStorage.removeItem('auth_token')
@@ -277,7 +279,7 @@ export default function App() {
                 
                 {isAuthed && (
                   <>
-                    {isAdmin ? (
+                    {isStaff ? (
                       <>
                         <Link to="/admin" className={getNavLinkClass('/admin')}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -299,14 +301,16 @@ export default function App() {
                           </svg>
                           <span className="nav-text">Check-In</span>
                         </Link>
-                        <Link to="/ads" className={getNavLinkClass('/ads')}>
+                        {isSuper && (
+                          <Link to="/ads" className={getNavLinkClass('/ads')}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                             <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                           <span className="nav-text">Ads</span>
-                        </Link>
+                          </Link>
+                        )}
                       </>
                     ) : (
                       <>
@@ -347,7 +351,7 @@ export default function App() {
                     />
                     <div className="user-details">
                       <div className="user-name">{user.name || 'User'}</div>
-                      <div className="user-role">{isAdmin ? 'Administrator' : 'User'}</div>
+                      <div className="user-role">{isSuper ? 'Super Admin' : (isAdmin ? 'Administrator' : 'User')}</div>
                     </div>
                   </div>
                   <button 

@@ -1,6 +1,6 @@
 import express from 'express'
 import { allAsync, runAsync } from '../db.js'
-import { authMiddleware, isAdmin } from '../utils/auth.js'
+import { authMiddleware, isSuperAdmin } from '../utils/auth.js'
 
 const router = express.Router()
 
@@ -14,8 +14,8 @@ router.get('/', async (_req, res) => {
   }
 })
 
-// GET /api/ads/all -> admin list of all ads
-router.get('/all', authMiddleware, isAdmin, async (_req, res) => {
+// GET /api/ads/all -> superadmin list of all ads
+router.get('/all', authMiddleware, isSuperAdmin, async (_req, res) => {
   try {
     const ads = await allAsync('SELECT * FROM ads ORDER BY createdAt DESC')
     res.json(ads)
@@ -24,8 +24,8 @@ router.get('/all', authMiddleware, isAdmin, async (_req, res) => {
   }
 })
 
-// POST /api/ads -> admin create ad { title, image(dataURL or URL), link, active }
-router.post('/', authMiddleware, isAdmin, async (req, res) => {
+// POST /api/ads -> superadmin create ad { title, image(dataURL or URL), link, active }
+router.post('/', authMiddleware, isSuperAdmin, async (req, res) => {
   try {
     const { title, image, link, active } = req.body
     if (!image) return res.status(400).json({ error: 'image is required' })
@@ -40,8 +40,8 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
   }
 })
 
-// DELETE /api/ads/:id -> admin delete
-router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
+// DELETE /api/ads/:id -> superadmin delete
+router.delete('/:id', authMiddleware, isSuperAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id)
     if (!id) return res.status(400).json({ error: 'Invalid id' })

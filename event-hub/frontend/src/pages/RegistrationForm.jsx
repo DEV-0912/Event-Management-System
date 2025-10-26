@@ -413,7 +413,7 @@ export default function RegistrationForm() {
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
   const authed = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
-  const isAdmin = !!authed && authed?.role === 'admin'
+  const isAdmin = !!authed && (authed?.role === 'admin' || authed?.role === 'superadmin')
 
   const selectedEvent = useMemo(() => events.find(ev => String(ev.id) === String(form.eventId)) || null, [events, form.eventId])
   const schema = useMemo(() => {

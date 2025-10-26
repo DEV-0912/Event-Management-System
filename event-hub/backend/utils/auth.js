@@ -19,3 +19,9 @@ export function isAdmin(req, res, next) {
   if (role === 'admin' || role === 'superadmin') return next()
   return res.status(403).json({ error: 'Forbidden' })
 }
+
+export function isSuperAdmin(req, res, next) {
+  const role = req.user?.role
+  if (role === 'superadmin') return next()
+  return res.status(403).json({ error: 'Forbidden' })
+}
