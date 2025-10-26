@@ -19,16 +19,23 @@ router.post('/google', async (req, res) => {
     const payload = ticket.getPayload()
     if (!payload || !payload.email) return res.status(401).json({ error: 'Invalid Google token' })
 
+    const emailLc = (payload.email || '').toLowerCase()
+    // Super Admins (highest privileges)
+    const superSingle = (process.env.SUPER_ADMIN_EMAIL || '').toLowerCase()
+    const superList = (process.env.SUPER_ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
+    const isSuperAdmin = (!!superSingle && emailLc === superSingle) || (superList.length > 0 && superList.includes(emailLc))
+
+    // Admins (normal admin privileges)
     const single = (process.env.ADMIN_EMAIL || '').toLowerCase()
     const list = (process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
-    const emailLc = (payload.email || '').toLowerCase()
     const isAdmin = (!!single && emailLc === single) || (list.length > 0 && list.includes(emailLc))
+
     const user = {
       sub: payload.sub,
       email: payload.email,
       name: payload.name,
       picture: payload.picture,
-      role: isAdmin ? 'admin' : 'student'
+      role: isSuperAdmin ? 'superadmin' : (isAdmin ? 'admin' : 'student')
     }
 
     const token = jwt.sign({ user }, JWT_SECRET, { expiresIn: '7d' })

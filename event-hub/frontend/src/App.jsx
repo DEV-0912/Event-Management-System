@@ -203,7 +203,7 @@ function RequireAdmin({ children }) {
   if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   let user = null
   try { user = JSON.parse(localStorage.getItem('auth_user') || 'null') } catch {}
-  if (user?.role !== 'admin') return <Navigate to="/me" replace />
+  if (user?.role !== 'admin' && user?.role !== 'superadmin') return <Navigate to="/me" replace />
   return children
 }
 
@@ -213,7 +213,7 @@ function RequireUser({ children }) {
   if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   let user = null
   try { user = JSON.parse(localStorage.getItem('auth_user') || 'null') } catch {}
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />
+  if (user?.role === 'admin' || user?.role === 'superadmin') return <Navigate to="/admin" replace />
   return children
 }
 
