@@ -2416,6 +2416,65 @@ export default function AdminDashboard() {
           flex-wrap: wrap;
         }
 
+        /* QR Toggle */
+        .qr-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 40px;
+          height: 22px;
+        }
+
+        .switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: var(--border);
+          transition: .2s;
+          border-radius: 999px;
+        }
+
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 16px;
+          width: 16px;
+          left: 3px;
+          top: 3px;
+          background-color: white;
+          transition: .2s;
+          border-radius: 50%;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .switch input:checked + .slider {
+          background-color: var(--primary);
+        }
+
+        .switch input:checked + .slider:before {
+          transform: translateX(18px);
+        }
+
+        .qr-label {
+          font-size: 12px;
+          color: var(--muted);
+          min-width: 86px;
+        }
+
         .event-details {
           display: flex;
           flex-direction: column;
