@@ -289,7 +289,7 @@ export default function App() {
                           </svg>
                           <span className="nav-text">Dashboard</span>
                         </Link>
-                        {isSuper && (
+                        {isAdmin && !isSuper && (
                           <>
                             <Link to="/new" className={getNavLinkClass('/new')}>
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
