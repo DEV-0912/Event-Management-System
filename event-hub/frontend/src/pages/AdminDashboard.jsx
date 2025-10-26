@@ -1536,6 +1536,8 @@ export default function AdminDashboard() {
   const [departmentFilters, setDepartmentFilters] = useState({})
   const user = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
   const isSuper = user?.role === 'superadmin'
+  const [perAdminStats, setPerAdminStats] = useState([])
+  const [capForm, setCapForm] = useState({}) // eventId -> { enforced, cap }
 
   const DEPT_MAP = {
     '66': 'AIML',
@@ -1573,6 +1575,7 @@ export default function AdminDashboard() {
         setEvents(all.data || [])
         // Aggregate totals for header cards
         const rows = Array.isArray(perAdmin.data) ? perAdmin.data : []
+        setPerAdminStats(rows)
         const totals = rows.reduce((acc, r) => {
           acc.totalEvents += Number(r.totalEvents || 0)
           acc.totalRegistrations += Number(r.totalRegistrations || 0)
@@ -1705,6 +1708,37 @@ export default function AdminDashboard() {
                 </svg>
               </button>
             </div>
+
+      {isSuper && perAdminStats.length > 0 && (
+        <section className="events-section" style={{marginTop: 16}}>
+          <div className="section-header">
+            <h2>Per-Admin Statistics</h2>
+            <p>Total events, registrations, and check-ins by admin</p>
+          </div>
+          <div className="card" style={{overflowX:'auto'}}>
+            <table className="table" style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead>
+                <tr>
+                  <th style={{textAlign:'left', padding:'8px'}}>Admin Email</th>
+                  <th style={{textAlign:'right', padding:'8px'}}>Events</th>
+                  <th style={{textAlign:'right', padding:'8px'}}>Registrations</th>
+                  <th style={{textAlign:'right', padding:'8px'}}>Checked-In</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perAdminStats.map(r => (
+                  <tr key={r.adminEmail || 'unknown'}>
+                    <td style={{padding:'8px'}}>{r.adminEmail || '—'}</td>
+                    <td style={{padding:'8px', textAlign:'right'}}>{r.totalEvents || 0}</td>
+                    <td style={{padding:'8px', textAlign:'right'}}>{r.totalRegistrations || 0}</td>
+                    <td style={{padding:'8px', textAlign:'right'}}>{r.totalCheckedIn || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
             <div className="modal-body">
               <p>{popup.text || 'Attendance sent successfully'}</p>
             </div>
@@ -1801,6 +1835,52 @@ export default function AdminDashboard() {
                     <span className="detail-label">Date:</span>
                     <span className="detail-value">{new Date(ev.date).toLocaleString()}</span>
                   </div>
+                  {/* Capacity editor */}
+                  <div className="event-details" style={{marginTop: 8}}>
+                    <div className="detail-item">
+                      <span className="detail-label">Limit registrations:</span>
+                      <span className="detail-value">
+                        <input
+                          type="checkbox"
+                          checked={(capForm[ev.id]?.enforced) ?? (Number(ev.regCapEnforced||0)===1)}
+                          onChange={e => setCapForm(prev => ({
+                            ...prev,
+                            [ev.id]: {
+                              enforced: e.target.checked,
+                              cap: (prev[ev.id]?.cap ?? Number(ev.regCap||0))
+                            }
+                          }))}
+                        />
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Max registrations:</span>
+                      <span className="detail-value">
+                        <input
+                          type="number"
+                          min="0"
+                          style={{width: 110}}
+                          value={String((capForm[ev.id]?.cap) ?? Number(ev.regCap||0))}
+                          onChange={e => setCapForm(prev => ({
+                            ...prev,
+                            [ev.id]: {
+                              enforced: (prev[ev.id]?.enforced) ?? (Number(ev.regCapEnforced||0)===1),
+                              cap: e.target.value.replace(/[^0-9]/g,'')
+                            }
+                          }))}
+                          disabled={!((capForm[ev.id]?.enforced) ?? (Number(ev.regCapEnforced||0)===1))}
+                        />
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <button className="refresh-btn" onClick={() => saveCapacity(ev)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Save Capacity</span>
+                      </button>
+                    </div>
+                  </div>
                   <div className="detail-item">
                     <span className="detail-label">Venue:</span>
                     <span className="detail-value">{ev.venue}</span>
@@ -1859,15 +1939,13 @@ export default function AdminDashboard() {
                   <div className="event-header">
                     <h3 className="event-name">{ev.name}</h3>
                     <div className="event-actions">
-                      {isSuper && (
-                        <button 
-                          className="toggle-regs-btn"
-                          onClick={() => toggleRegistration(ev)}
-                          title={Number(ev.regClosed || 0) === 1 ? 'Open registrations' : 'Close registrations'}
-                        >
-                          {Number(ev.regClosed || 0) === 1 ? 'Open Reg' : 'Close Reg'}
-                        </button>
-                      )}
+                      <button 
+                        className="toggle-regs-btn" 
+                        onClick={() => toggleRegistration(ev)}
+                        title={Number(ev.regClosed || 0) === 1 ? 'Open registrations' : 'Close registrations'}
+                      >
+                        {Number(ev.regClosed || 0) === 1 ? 'Open Reg' : 'Close Reg'}
+                      </button>
                       <button 
                         className="toggle-regs-btn" 
                         onClick={() => toggleRegs(ev.id)}

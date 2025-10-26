@@ -128,6 +128,8 @@ export default function EventForm() {
   const [poster, setPoster] = useState('')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [regCapEnforced, setRegCapEnforced] = useState(false)
+  const [regCap, setRegCap] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
@@ -146,13 +148,24 @@ export default function EventForm() {
       if (!hasRoll) formSchema.push({ id: formSchema.length + 1, label: 'Roll Number', type: 'text', required: true })
       if (!hasPayment) formSchema.push({ id: formSchema.length + 1, label: 'Payment ID', type: 'text', required: true })
 
-      await api.post('/api/events', { ...form, formSchema, poster })
+      // Normalize capacity fields
+      const capNum = Number(regCap || 0)
+      const payload = {
+        ...form,
+        formSchema,
+        poster,
+        regCapEnforced: !!regCapEnforced,
+        regCap: Number.isFinite(capNum) ? Math.max(0, capNum) : 0
+      }
+      await api.post('/api/events', payload)
       setMessage('Event created successfully!')
       // Reset form
       setForm({ name: '', date: '', venue: '', speaker: '', food: '' })
       setFields([])
       setNewField({ label: '', type: 'text', options: '' })
       setPoster('')
+      setRegCapEnforced(false)
+      setRegCap('')
     } catch (e) {
       setMessage('Failed to create event')
     } finally {
@@ -311,6 +324,41 @@ export default function EventForm() {
                   value={form.description}
                   onChange={e => set('description', e.target.value)}
                   placeholder="Describe the event for attendees..."
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <div className="section-header">
+            <h2>Registration Controls</h2>
+            <p>Limit registrations if needed</p>
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">
+                <span style={{display:'flex', alignItems:'center', gap:8}}>
+                  <input
+                    type="checkbox"
+                    checked={regCapEnforced}
+                    onChange={e => setRegCapEnforced(e.target.checked)}
+                  />
+                  Limit registrations
+                </span>
+              </label>
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Max registrations
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 100"
+                  value={regCap}
+                  onChange={e => setRegCap(e.target.value.replace(/[^0-9]/g, ''))}
+                  disabled={!regCapEnforced}
                 />
               </label>
             </div>
