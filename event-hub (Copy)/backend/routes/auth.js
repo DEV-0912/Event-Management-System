@@ -1,0 +1,85 @@
+import express from 'express'
+import jwt from 'jsonwebtoken'
+import { OAuth2Client } from 'google-auth-library'
+
+const router = express.Router()
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'
+
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body
+    console.log('[AUTH] /google request', { hasCredential: !!credential, ip: req.ip, ua: req.headers['user-agent'] })
+    if (!credential) return res.status(400).json({ error: 'credential is required' })
+    const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
+    if (!GOOGLE_CLIENT_ID) return res.status(500).json({ error: 'GOOGLE_CLIENT_ID not configured on server' })
+    const oAuthClient = new OAuth2Client(GOOGLE_CLIENT_ID)
+
+    const ticket = await oAuthClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID })
+    const payload = ticket.getPayload()
+    if (!payload || !payload.email) return res.status(401).json({ error: 'Invalid Google token' })
+
+    const single = (process.env.ADMIN_EMAIL || '').toLowerCase()
+    const list = (process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
+    const emailLc = (payload.email || '').toLowerCase()
+    const isAdmin = (!!single && emailLc === single) || (list.length > 0 && list.includes(emailLc))
+    const user = {
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture,
+      role: isAdmin ? 'admin' : 'student'
+    }
+
+    const token = jwt.sign({ user }, JWT_SECRET, { expiresIn: '7d' })
+    console.log('[AUTH] success', { email: user.email, role: user.role })
+    // Set HTTP-only cookie for session auth (also return token for backward compatibility)
+    const maxAge = 7 * 24 * 60 * 60 * 1000
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+      maxAge,
+    })
+    res.json({ token, user })
+  } catch (err) {
+    console.error('[AUTH] error', err?.stack || err)
+    res.status(401).json({ error: 'Google authentication failed', details: err.message })
+  }
+})
+
+// Return current user info from token
+router.get('/me', (req, res) => {
+  try {
+    const header = req.headers.authorization || ''
+    let token = header.startsWith('Bearer ') ? header.slice(7) : ''
+    if (!token) {
+      const raw = req.headers.cookie || ''
+      const cookies = Object.fromEntries(raw.split(';').map(s => s.trim()).filter(Boolean).map(p => {
+        const i = p.indexOf('=');
+        const k = i>=0 ? decodeURIComponent(p.slice(0,i)) : p; 
+        const v = i>=0 ? decodeURIComponent(p.slice(i+1)) : '';
+        return [k, v]
+      }))
+      token = cookies['auth_token'] || ''
+    }
+    if (!token) return res.status(401).json({ error: 'Unauthorized' })
+    const payload = jwt.verify(token, JWT_SECRET)
+    res.json(payload.user || payload)
+  } catch {
+    res.status(401).json({ error: 'Unauthorized' })
+  }
+})
+
+export default router
+
+// Add a logout route to clear the cookie
+router.post('/logout', (req, res) => {
+  try {
+    res.cookie('auth_token', '', { httpOnly: true, secure: true, sameSite: 'none', path: '/', maxAge: 0 })
+    res.json({ success: true })
+  } catch {
+    res.status(500).json({ error: 'Logout failed' })
+  }
+})
