@@ -57,4 +57,4 @@ backend/dist/
 backend/build/
 
 # Frontend node modules
-frontend/node_modules/
+frontend/node_modules/event-hub/backend/eventhub.sqlite
