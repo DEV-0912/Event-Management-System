@@ -1324,6 +1324,16 @@
 //           transition: all 0.2s;
 //         }
 
+  const toggleQr = async (ev) => {
+    try {
+      const nextEnabled = !(Number(ev.regQrEnabled) === 1)
+      await api.post(`/api/events/${ev.id}/qr-toggle`, { enabled: nextEnabled })
+      await load()
+    } catch (e) {
+      setMessage(e?.response?.data?.error || 'Failed to toggle QR')
+    }
+  }
+
 //         .close-btn:hover {
 //           background: rgba(255, 255, 255, 0.1);
 //           color: var(--text);
