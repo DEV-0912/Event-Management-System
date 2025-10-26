@@ -1,17 +1,133 @@
+// import { useState } from 'react'
+// import { api } from '../api'
+
+// export default function EventForm() {
+//   const [form, setForm] = useState({ name: '', date: '', venue: '', speaker: '', food: '' })
+//   const [message, setMessage] = useState('')
+//   const [fields, setFields] = useState([])
+//   const [newField, setNewField] = useState({ label: '', type: 'text', options: '' })
+//   const [poster, setPoster] = useState('')
+
+//   const submit = async (e) => {
+//     e.preventDefault()
+//     try {
+//       const formSchema = fields.map((f, idx) => ({ id: idx + 1, label: f.label.trim(), type: f.type, options: f.options?.length ? f.options : undefined }))
+//       await api.post('/api/events', { ...form, formSchema, poster })
+//       setMessage('Event created!')
+//       setForm({ name: '', date: '', venue: '', speaker: '', food: '', description: '' })
+//       setFields([])
+//       setNewField({ label: '', type: 'text', options: '' })
+//       setPoster('')
+//     } catch (e) {
+//       setMessage('Failed to create event')
+//     }
+//   }
+
+//   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+
+//   const addField = () => {
+//     if (!newField.label.trim()) return
+//     const field = {
+//       label: newField.label.trim(),
+//       type: newField.type,
+//       options: (newField.type === 'select' || newField.type === 'multiselect')
+//         ? newField.options.split(',').map(s => s.trim()).filter(Boolean)
+//         : []
+//     }
+//     setFields(prev => [...prev, field])
+//     setNewField({ label: '', type: 'text', options: '' })
+//   }
+//   const removeField = (i) => setFields(prev => prev.filter((_, idx) => idx !== i))
+
+//   const onPosterChange = (file) => {
+//     if (!file) { setPoster(''); return }
+//     const reader = new FileReader()
+//     reader.onload = () => setPoster(String(reader.result || ''))
+//     reader.readAsDataURL(file)
+//   }
+
+//   return (
+//     <div>
+//       <h1>Create Event</h1>
+//       {message && <div className="alert">{message}</div>}
+//       <form onSubmit={submit} className="form">
+//         <label>Name<input value={form.name} onChange={e => set('name', e.target.value)} required /></label>
+//         <label>Date/time<input type="datetime-local" value={form.date} onChange={e => set('date', e.target.value)} required /></label>
+//         <label>Venue<input value={form.venue} onChange={e => set('venue', e.target.value)} required /></label>
+//         <label>Speaker<input value={form.speaker} onChange={e => set('speaker', e.target.value)} /></label>
+//         <label>Food<input value={form.food} onChange={e => set('food', e.target.value)} /></label>
+
+//         <div>
+//           <strong>Poster</strong>
+//           <div style={{display:'grid', gap:8, marginTop:8}}>
+//             <input type="file" accept="image/*" onChange={e => onPosterChange(e.target.files?.[0])} />
+//             {poster && (
+//               <div className="qr" style={{gap:8}}>
+//                 <img src={poster} alt="Poster preview" style={{maxWidth:280, borderRadius:10, border:'1px solid var(--border)'}} />
+//                 <button type="button" className="danger" onClick={() => setPoster('')}>Remove Poster</button>
+//               </div>
+//             )}
+//           </div>
+//         </div>
+
+//         <div>
+//           <strong>Custom Registration Fields</strong>
+//           <div style={{display:'grid', gap:8, marginTop:8}}>
+//             <label>Label<input value={newField.label} onChange={e => setNewField(v => ({...v, label: e.target.value}))} placeholder="e.g. T-Shirt Size" /></label>
+//             <label>Type<select value={newField.type} onChange={e => setNewField(v => ({...v, type: e.target.value}))}>
+//               <option value="text">Text</option>
+//               <option value="select">Options (single choice)</option>
+//               <option value="multiselect">Options (multiple)</option>
+//               <option value="checkbox">Tick mark (Yes/No)</option>
+//             </select></label>
+//             {(newField.type === 'select' || newField.type === 'multiselect') && (
+//               <label>Options (comma separated)<input value={newField.options} onChange={e => setNewField(v => ({...v, options: e.target.value}))} placeholder="S, M, L, XL" /></label>
+//             )}
+//             <div style={{display:'flex', gap:8}}>
+//               <button type="button" onClick={addField}>Add Field</button>
+//             </div>
+//           </div>
+
+//           {fields.length > 0 && (
+//             <div className="list" style={{marginTop:12}}>
+//               {fields.map((f, i) => (
+//                 <div className="card" key={i}>
+//                   <div className="row"><strong>{f.label}</strong> — {f.type}{(f.type==='select'||f.type==='multiselect') && ` [${f.options.join(', ')}]`}</div>
+//                   <div className="actions"><button type="button" className="danger" onClick={() => removeField(i)}>Remove</button></div>
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
+//         <button type="submit">Create</button>
+//       </form>
+//     </div>
+//   )
+// }
+
+
 import { useState } from 'react'
 import { api } from '../api'
 
 export default function EventForm() {
-  const [form, setForm] = useState({ name: '', date: '', venue: '', speaker: '', food: '', description: '' })
+  const [form, setForm] = useState({ 
+    name: '', 
+    date: '', 
+    venue: '', 
+    speaker: '', 
+    food: '',
+    description: '' 
+  })
   const [message, setMessage] = useState('')
   const [fields, setFields] = useState([])
-  const [newField, setNewField] = useState({ label: '', type: 'text', options: '' })
+  const [newField, setNewField] = useState({ 
+    label: '', 
+    type: 'text', 
+    options: '' 
+  })
   const [poster, setPoster] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [createdEvent, setCreatedEvent] = useState(null)
-  const [showPostCreate, setShowPostCreate] = useState(false)
-  const [savingPoster, setSavingPoster] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -23,14 +139,13 @@ export default function EventForm() {
         type: f.type, 
         options: f.options?.length ? f.options : undefined 
       }))
-      const { data } = await api.post('/api/events', { ...form, formSchema })
-      setCreatedEvent(data)
-      setShowPostCreate(true)
-      setMessage('Event created successfully! You can now share the link and upload a poster.')
-      // Reset form inputs
-      setForm({ name: '', date: '', venue: '', speaker: '', food: '', description: '' })
+      await api.post('/api/events', { ...form, formSchema, poster })
+      setMessage('Event created successfully!')
+      // Reset form
+      setForm({ name: '', date: '', venue: '', speaker: '', food: '' })
       setFields([])
       setNewField({ label: '', type: 'text', options: '' })
+      setPoster('')
     } catch (e) {
       setMessage('Failed to create event')
     } finally {
@@ -41,7 +156,10 @@ export default function EventForm() {
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
   const addField = () => {
-    if (!newField.label.trim()) return
+    if (!newField.label.trim()) {
+      setMessage('Field label is required')
+      return
+    }
     const field = {
       label: newField.label.trim(),
       type: newField.type,
@@ -56,11 +174,16 @@ export default function EventForm() {
   const removeField = (i) => setFields(prev => prev.filter((_, idx) => idx !== i))
 
   const onPosterChange = (file) => {
-    if (!file) { setPoster(''); return }
+    if (!file) { 
+      setPoster(''); 
+      return 
+    }
+    
     if (!file.type.startsWith('image/')) {
       setMessage('Please select an image file')
       return
     }
+    
     if (file.size > 5 * 1024 * 1024) {
       setMessage('Image size must be less than 5MB')
       return
@@ -79,45 +202,6 @@ export default function EventForm() {
     reader.readAsDataURL(file)
   }
 
-  const registrationLink = createdEvent ? `${window.location.origin}/events/${createdEvent.id}/register` : ''
-
-  const copyRegistrationLink = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: createdEvent?.name || 'Event Registration', text: 'Register using this link:', url: registrationLink })
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(registrationLink)
-        setMessage('Registration link copied to clipboard')
-      }
-    } catch {}
-  }
-
-  const qrImgUrl = createdEvent ? `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(registrationLink)}` : ''
-
-  const downloadQrImage = () => {
-    if (!qrImgUrl) return
-    const a = document.createElement('a')
-    a.href = qrImgUrl
-    a.download = `${(createdEvent?.name || 'event').replace(/[^a-z0-9-_]+/gi, '-')}-registration-qr.png`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  }
-
-  const uploadPosterNow = async () => {
-    if (!createdEvent || !poster) return
-    setSavingPoster(true)
-    try {
-      const { data } = await api.patch(`/api/events/${createdEvent.id}/poster`, { poster })
-      setCreatedEvent(data)
-      setMessage('Poster uploaded and saved.')
-    } catch (e) {
-      setMessage('Failed to upload poster')
-    } finally {
-      setSavingPoster(false)
-    }
-  }
-
   return (
     <div className="container">
       <div className="dashboard-header">
@@ -133,7 +217,7 @@ export default function EventForm() {
             <span>{message}</span>
             <button className="alert-close" onClick={() => setMessage('')}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </button>
           </div>
@@ -223,6 +307,68 @@ export default function EventForm() {
                 />
               </label>
             </div>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <div className="section-header">
+            <h2>Event Poster</h2>
+            <p>Upload an image to promote your event</p>
+          </div>
+          
+          <div className="poster-upload">
+            <label className="form-label">
+              Event Poster
+              <div className="file-upload-area" onClick={() => document.getElementById('poster-input').click()}>
+                <input 
+                  id="poster-input"
+                  type="file" 
+                  className="file-input"
+                  accept="image/*" 
+                  onChange={e => onPosterChange(e.target.files?.[0])} 
+                />
+                <div className="upload-content">
+                  {uploading ? (
+                    <div className="upload-loading">
+                      <div className="spinner-small"></div>
+                      <span>Uploading image...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 16L8.586 11.414C9.366 10.634 10.634 10.634 11.414 11.414L16 16M14 14L15.586 12.414C16.366 11.634 17.634 11.634 18.414 12.414L20 14M14 8H14.01M6 20H18C19.105 20 20 19.105 20 18V6C20 4.895 19.105 4 18 4H6C4.895 4 4 4.895 4 6V18C4 19.105 4.895 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <div className="upload-text">
+                        <span className="upload-title">Click to upload poster</span>
+                        <span className="upload-subtitle">PNG, JPG up to 5MB</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </label>
+            
+            {poster && (
+              <div className="image-preview">
+                <div className="preview-header">
+                  <span>Poster Preview</span>
+                  <button 
+                    type="button" 
+                    className="remove-image-btn"
+                    onClick={() => setPoster('')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Remove
+                  </button>
+                </div>
+                <div className="preview-image">
+                  <img src={poster} alt="Poster preview" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -356,76 +502,6 @@ export default function EventForm() {
           </button>
         </div>
       </form>
-
-      {showPostCreate && createdEvent && (
-        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'grid', placeItems:'center', padding:'16px', zIndex:1000}} onClick={() => setShowPostCreate(false)}>
-          <div className="form-section" style={{maxWidth:720, width:'100%', position:'relative'}} onClick={e => e.stopPropagation()}>
-            <div className="section-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-              <h2>Next Steps</h2>
-              <button className="alert-close" onClick={() => setShowPostCreate(false)} aria-label="Close">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-            <div className="custom-fields">
-              <div className="add-field-form">
-                <h3>Share Registration</h3>
-                <p style={{margin:'6px 0 12px', color:'var(--muted)'}}>Scan or share the QR code, or copy the link below.</p>
-                <div style={{display:'grid', gap:12, justifyItems:'center'}}>
-                  <div style={{background:'white', padding:12, borderRadius:12, border:'1px solid var(--border)'}}>
-                    {qrImgUrl && <img src={qrImgUrl} alt="Registration QR" style={{width:220, height:220}} />}
-                  </div>
-                  <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                    <button type="button" className="primary-btn" onClick={downloadQrImage}>Download QR</button>
-                    <button type="button" className="primary-btn" onClick={copyRegistrationLink}>Copy/Share Link</button>
-                  </div>
-                  <input className="form-input" readOnly value={registrationLink} />
-                </div>
-              </div>
-
-              <div className="add-field-form">
-                <h3>Upload Poster (Optional)</h3>
-                <p style={{margin:'6px 0 12px', color:'var(--muted)'}}>Add a poster image to promote your event.</p>
-                <div className="file-upload-area" onClick={() => document.getElementById('poster-input-inline')?.click()}>
-                  <input id="poster-input-inline" type="file" className="file-input" accept="image/*" onChange={e => onPosterChange(e.target.files?.[0])} />
-                  <div className="upload-content">
-                    {uploading ? (
-                      <div className="upload-loading"><div className="spinner-small"></div><span>Reading image...</span></div>
-                    ) : (
-                      <>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                          <path d="M4 16L8.586 11.414C9.366 10.634 10.634 10.634 11.414 11.414L16 16M14 14L15.586 12.414C16.366 11.634 17.634 11.634 18.414 12.414L20 14M14 8H14.01M6 20H18C19.105 20 20 19.105 20 18V6C20 4.895 19.105 4 18 4H6C4.895 4 4 4.895 4 6V18C4 19.105 4.895 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <div className="upload-text">
-                          <span className="upload-title">Click to choose poster</span>
-                          <span className="upload-subtitle">PNG, JPG up to 5MB</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {poster && (
-                  <div className="image-preview" style={{marginTop:12}}>
-                    <div className="preview-header">
-                      <span>Preview</span>
-                      <button type="button" className="remove-image-btn" onClick={() => setPoster('')}>Remove</button>
-                    </div>
-                    <div className="preview-image">
-                      <img src={poster} alt="Poster preview" />
-                    </div>
-                  </div>
-                )}
-                <div className="form-actions" style={{marginTop:12}}>
-                  <button type="button" className="primary-btn" disabled={!poster || savingPoster} onClick={uploadPosterNow}>
-                    {savingPoster ? 'Saving...' : 'Upload Poster'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         .dashboard-header {

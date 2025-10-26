@@ -52,31 +52,6 @@ router.post('/:id/claim', authMiddleware, isAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/events/:id/poster → update poster separately
-router.patch('/:id/poster', authMiddleware, isAdmin, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { poster } = req.body || {};
-    if (!id) return res.status(400).json({ error: 'Invalid id' });
-    if (poster != null && typeof poster !== 'string') {
-      return res.status(400).json({ error: 'poster must be a base64 data URL string or null' });
-    }
-    const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
-    const ev = rows[0];
-    if (!ev) return res.status(404).json({ error: 'Event not found' });
-    // Ownership: only creator (or unowned) can update
-    const email = req.user?.email || '';
-    if (ev.createdBy && ev.createdBy !== email) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    await runAsync('UPDATE events SET poster = ? WHERE id = ?', [poster || null, id]);
-    const updated = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
-    res.json(updated[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/events → list events
 router.get('/', async (_req, res) => {
   try {

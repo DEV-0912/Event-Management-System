@@ -19,3 +19,42 @@ build/
 # IDE/editor files
 .vscode/
 .idea/
+# Backend node modules
+backend/node_modules/
+backend/package-lock.json
+
+# Backend environment files
+backend/.env
+backend/.env.local
+
+# Backend build/output if any
+backend/dist/
+backend/build/
+
+# Frontend node modules
+frontend/node_modules/
+frontend/package-lock.json
+
+# Frontend environment files
+frontend/.env
+frontend/.env.local
+
+# Frontend build/output if any
+frontend/dist/
+frontend/build/
+
+
+# Backend node modules
+backend/node_modules/
+backend/package-lock.json
+
+# Backend environment files
+backend/.env
+backend/.env.local
+
+# Backend build/output if any
+backend/dist/
+backend/build/
+
+# Frontend node modules
+frontend/node_modules/
