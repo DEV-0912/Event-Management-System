@@ -14,12 +14,30 @@
 //     return null;
 //   }
 
+/**
+ * Ensure qrAllowance column exists (lazy migration)
+ */
+async function ensureQrAllowanceColumn() {
+  try {
+    await runAsync("ALTER TABLE registrations ADD COLUMN qrAllowance INTEGER DEFAULT 0");
+    console.log('[MIGRATION] registrations.qrAllowance added');
+  } catch (e) {
+    // ignore if exists
+  }
+}
+
+ 
+
 // async function sendEmailWithAttachment(toList, subject, html, attachment) {
 //   const user = process.env.EMAIL_USER;
 //   const pass = process.env.EMAIL_PASS;
 //   if (!user || !pass) return; // optional
 
 //   const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+
+ 
+ 
+ 
 //   const to = Array.isArray(toList) ? toList.join(',') : String(toList || '');
 //   const attachments = attachment ? [attachment] : [];
 //   await transporter.sendMail({ from: user, to, subject, html, attachments });
@@ -35,6 +53,8 @@
 //     service: 'gmail',
 //     auth: { user, pass }
 //   });
+
+ 
 
 // // POST /api/registration/event/:eventId/send-attendance
 // // Body: { recipients: string[] }
@@ -219,9 +239,33 @@ import QRCode from 'qrcode';
 import nodemailer from 'nodemailer';
 import { allAsync, getAsync, runAsync } from '../db.js';
 import { authMiddleware, isAdmin } from '../utils/auth.js';
-import { getDeptCodeFromEmail } from '../utils/department.js';
+import { getDeptCodeFromEmail, getDeptCodeFromRoll } from '../utils/department.js';
+import crypto from 'crypto';
 
 const router = express.Router();
+
+/**
+ * Ensure qrCount column exists (lazy migration)
+ */
+async function ensureQrCountColumn() {
+  try {
+    await runAsync("ALTER TABLE registrations ADD COLUMN qrCount INTEGER DEFAULT 0");
+    console.log('[MIGRATION] registrations.qrCount added');
+  } catch (e) {
+    // ignore if exists
+  }
+}
+
+/**
+ * Build signed, expiring QR payload
+ */
+function buildSignedQrPayload(eventId, regId, ttlMs = 10000) {
+  const exp = Date.now() + Math.max(1000, ttlMs);
+  const secret = process.env.QR_SECRET || (process.env.JWT_SECRET || 'eventhub_dev_secret');
+  const data = `${eventId}|${regId}|${exp}`;
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex').slice(0, 32);
+  return { payload: `${data}|${sig}`, exp };
+}
 
 /**
  * Convert data URL to Buffer
@@ -325,6 +369,59 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ error: 'You have already registered for this event.' });
     }
 
+    // Registration window enforcement
+    try {
+      const now = Date.now();
+      const start = event?.startAt ? new Date(event.startAt).getTime() : (event?.date ? new Date(event.date).getTime() : NaN);
+      const regCloseAt = event?.regCloseAt ? new Date(event.regCloseAt).getTime() : NaN;
+      const manualClosed = Number(event?.regClosed || 0) === 1;
+      const started = Number.isFinite(start) && now >= start;
+      const deadlinePassed = Number.isFinite(regCloseAt) && now > regCloseAt;
+      const allowAfterStart = Number(event?.allowAfterStart || 0) === 1;
+
+      // Check manual close
+      if (manualClosed) {
+        return res.status(403).json({ error: 'Registration closed: Registration closed by admin' });
+      }
+
+      // Check deadline
+      if (deadlinePassed) {
+        return res.status(403).json({ error: 'Registration closed: Registration deadline passed' });
+      }
+
+      // Check if event started (unless allowAfterStart is enabled)
+      if (started && !allowAfterStart) {
+        return res.status(403).json({ error: 'Registration closed: Event already started' });
+      }
+
+      // Check registration cap
+      const regCapEnforced = Number(event?.regCapEnforced || 0) === 1;
+      const regCap = Number(event?.regCap || 0);
+      if (regCapEnforced && regCap > 0) {
+        const countResult = await getAsync('SELECT COUNT(*) as count FROM registrations WHERE eventId = ?', [eventId]);
+        const currentCount = countResult?.count || 0;
+        if (currentCount >= regCap) {
+          return res.status(403).json({ error: 'Registration closed: Registration capacity reached' });
+        }
+      }
+    } catch {}
+
+    // If event form schema asks for Roll/Payment, enforce them in answers
+    try {
+      const schema = event?.formSchema ? (typeof event.formSchema === 'string' ? JSON.parse(event.formSchema) : event.formSchema) : []
+      const requiresRoll = Array.isArray(schema) && schema.some(f => /roll/i.test(String(f?.label || '')))
+      const requiresPayment = Array.isArray(schema) && schema.some(f => /payment/i.test(String(f?.label || '')))
+      const ans = answers ? (typeof answers === 'string' ? JSON.parse(answers) : answers) : null
+      if (requiresRoll) {
+        const hasRoll = ans && Object.keys(ans).some(k => /roll/i.test(k) && String(ans[k] ?? '').trim().length > 0)
+        if (!hasRoll) return res.status(400).json({ error: 'Roll number is required for this event' })
+      }
+      if (requiresPayment) {
+        const hasPayment = ans && Object.keys(ans).some(k => /payment/i.test(k) && String(ans[k] ?? '').trim().length > 0)
+        if (!hasPayment) return res.status(400).json({ error: 'Payment ID is required for this event' })
+      }
+    } catch {}
+
     // Insert registration
     const result = await runAsync(
       'INSERT INTO registrations (name, email, contact, eventId, checkedIn, answers) VALUES (?,?,?,?,0,?)',
@@ -336,8 +433,10 @@ router.post('/', async (req, res) => {
     const qrDataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 300 });
     console.log('[REGISTER] QR generated, length:', qrDataUrl.length);
 
-    // Send email with QR
-    await sendEmailWithQR(email, 'Your Event Registration QR', 'Thank you for registering! Keep this email.', qrDataUrl, event);
+    // Optional: send email with QR (disabled by default)
+    if (String(process.env.SEND_QR_EMAIL || 'false').toLowerCase() === 'true') {
+      await sendEmailWithQR(email, 'Your Event Registration QR', 'Thank you for registering! Keep this email.', qrDataUrl, event);
+    }
 
     // Store QR in DB
     await runAsync('UPDATE registrations SET qrCode = ? WHERE id = ?', [qrDataUrl, result.id]);
@@ -368,7 +467,19 @@ router.get('/admin', authMiddleware, isAdmin, async (req, res) => {
     }
     sql += ' ORDER BY e.date DESC, r.id DESC';
     const rows = await allAsync(sql, params);
-    const out = dept ? rows.filter(r => getDeptCodeFromEmail(r.email) === dept) : rows;
+    const out = dept ? rows.filter(r => {
+      // Try roll first
+      let roll = '';
+      try {
+        const ans = r.answers ? (typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers) : null;
+        if (ans) {
+          const key = Object.keys(ans).find(k => /roll/i.test(k));
+          if (key) roll = Array.isArray(ans[key]) ? ans[key].join('|') : String(ans[key]);
+        }
+      } catch {}
+      const code = getDeptCodeFromRoll(roll) || getDeptCodeFromEmail(r.email);
+      return code === dept;
+    }) : rows;
     res.json(out);
   } catch (err) {
     console.error('[ADMIN LIST] error', err);
@@ -385,9 +496,34 @@ router.post('/checkin', async (req, res) => {
     const { qr } = req.body;
     if (!qr) return res.status(400).json({ error: 'qr is required' });
 
-    const [eventIdStr, userIdStr] = qr.split('|');
-    const eventId = Number(eventIdStr);
-    const userId = Number(userIdStr);
+    const parts = String(qr).split('|');
+    let eventId = 0;
+    let userId = 0;
+
+    if (parts.length === 2) {
+      // Legacy payload: eventId|registrationId (no expiry)
+      const [eventIdStr, userIdStr] = parts;
+      eventId = Number(eventIdStr);
+      userId = Number(userIdStr);
+    } else if (parts.length === 4) {
+      // New payload: eventId|registrationId|exp|sig
+      const [eventIdStr, userIdStr, expStr, sig] = parts;
+      eventId = Number(eventIdStr);
+      userId = Number(userIdStr);
+      const exp = Number(expStr);
+      if (!exp || Date.now() > exp) {
+        return res.status(410).json({ error: 'QR expired' });
+      }
+      const secret = process.env.QR_SECRET || (process.env.JWT_SECRET || 'eventhub_dev_secret');
+      const data = `${eventId}|${userId}|${exp}`;
+      const expected = crypto.createHmac('sha256', secret).update(data).digest('hex').slice(0, 32);
+      if (sig !== expected) {
+        return res.status(400).json({ error: 'Invalid QR signature' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid QR payload' });
+    }
+
     console.log('[CHECKIN] parsed QR:', { eventId, userId });
 
     const reg = await getAsync('SELECT * FROM registrations WHERE id = ? AND eventId = ?', [userId, eventId]);
@@ -400,6 +536,127 @@ router.post('/checkin', async (req, res) => {
     res.json({ success: true, registration: updated });
   } catch (err) {
     console.error('[CHECKIN] error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Generate a short-lived QR for a registration (owner only)
+ * POST /api/registration/:id/generate-qr
+ */
+router.post('/:id/generate-qr', authMiddleware, async (req, res) => {
+  try {
+    await ensureQrCountColumn();
+    await ensureQrAllowanceColumn();
+    const regId = Number(req.params.id);
+    if (!regId) return res.status(400).json({ error: 'Invalid registration id' });
+
+    const reg = await getAsync('SELECT * FROM registrations WHERE id = ?', [regId]);
+    if (!reg) return res.status(404).json({ error: 'Registration not found' });
+
+    const email = (req.user?.email || '').toLowerCase();
+    if (!email || email !== String(reg.email).toLowerCase()) {
+      await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'not_owner']);
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Fetch event (ensure exists); no toggle enforcement
+    const ev = await getAsync('SELECT * FROM events WHERE id = ?', [reg.eventId]);
+    if (!ev) {
+      await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'event_not_found']);
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const currentCount = Number(reg.qrCount || 0);
+    const allowance = Number(reg.qrAllowance || 0);
+    const maxAllowed = 2 + Math.max(0, allowance);
+    if (currentCount >= maxAllowed) {
+      await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'limit_reached']);
+      return res.status(429).json({ error: 'QR generation limit reached' });
+    }
+
+    const { payload, exp } = buildSignedQrPayload(reg.eventId, reg.id, 10000);
+    const dataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 300 });
+
+    await runAsync('UPDATE registrations SET qrCount = ? WHERE id = ?', [currentCount + 1, regId]);
+    await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'generated', 'ok']);
+
+    res.json({ dataUrl, payload, expiresAt: exp, remaining: Math.max(0, maxAllowed - (currentCount + 1)), limit: maxAllowed });
+  } catch (err) {
+    console.error('[GENERATE-QR] error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Admin: grant extra QR attempts (+2) for a specific registration
+ * POST /api/registration/:id/qr-grant
+ */
+router.post('/:id/qr-grant', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    await ensureQrAllowanceColumn();
+    const regId = Number(req.params.id);
+    if (!regId) return res.status(400).json({ error: 'Invalid registration id' });
+    const reg = await getAsync('SELECT r.*, e.createdBy as owner FROM registrations r JOIN events e ON e.id = r.eventId WHERE r.id = ?', [regId]);
+    if (!reg) return res.status(404).json({ error: 'Registration not found' });
+    const me = (req.user?.email || '').toLowerCase();
+    const role = req.user?.role;
+    const owner = String(reg.owner || '').toLowerCase();
+    if (!(role === 'superadmin' || (owner && me === owner))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    // Allow grant only once (+2 attempts maximum)
+    const currentAllowance = Number(reg.qrAllowance || 0);
+    if (currentAllowance >= 2) {
+      return res.status(409).json({ error: 'QR allowance already granted' });
+    }
+    const nextAllowance = currentAllowance + 2;
+    await runAsync('UPDATE registrations SET qrAllowance = ? WHERE id = ?', [nextAllowance, regId]);
+    await runAsync('INSERT INTO audit_logs (actorEmail, action, targetType, targetId, meta) VALUES (?,?,?,?,?)', [me, 'qr_grant', 'registration', regId, JSON.stringify({ delta: 2, eventId: reg.eventId })]);
+    res.json({ success: true, qrAllowance: nextAllowance });
+  } catch (err) {
+    console.error('[QR-GRANT] error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Admin: reset QR attempts to 0 for a registration (owner admin or superadmin)
+ */
+router.post('/:id/qr-reset', authMiddleware, async (req, res) => {
+  try {
+    const regId = Number(req.params.id);
+    if (!regId) return res.status(400).json({ error: 'Invalid registration id' });
+    const reg = await getAsync('SELECT r.*, e.createdBy as owner FROM registrations r JOIN events e ON e.id = r.eventId WHERE r.id = ?', [regId]);
+    if (!reg) return res.status(404).json({ error: 'Registration not found' });
+
+    const role = req.user?.role;
+    const me = (req.user?.email || '').toLowerCase();
+    const owner = String(reg.owner || '').toLowerCase();
+    if (!(role === 'superadmin' || (owner && me === owner))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    await runAsync('UPDATE registrations SET qrCount = 0 WHERE id = ?', [regId]);
+    await runAsync('INSERT INTO audit_logs (actorEmail, action, targetType, targetId, meta) VALUES (?,?,?,?,?)', [me, 'qr_reset', 'registration', regId, JSON.stringify({ eventId: reg.eventId })]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Admin: generate QR code data URL for a given registration link
+ * POST /api/registration/qr
+ * Body: { url: string }
+ */
+router.post('/qr', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const url = String(req.body?.url || '').trim();
+    if (!url) return res.status(400).json({ error: 'url is required' });
+    const dataUrl = await QRCode.toDataURL(url, { margin: 1, width: 300 });
+    res.json({ dataUrl });
+  } catch (err) {
+    console.error('[QR GENERATE] error', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -481,7 +738,18 @@ router.get('/event/:eventId', async (req, res) => {
     const eventId = Number(req.params.eventId);
     const regs = await allAsync('SELECT * FROM registrations WHERE eventId = ?', [eventId]);
     const dept = (req.query?.dept || '').trim();
-    const filtered = dept ? regs.filter(r => getDeptCodeFromEmail(r.email) === dept) : regs;
+    const filtered = dept ? regs.filter(r => {
+      let roll = '';
+      try {
+        const ans = r.answers ? (typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers) : null;
+        if (ans) {
+          const key = Object.keys(ans).find(k => /roll/i.test(k));
+          if (key) roll = Array.isArray(ans[key]) ? ans[key].join('|') : String(ans[key]);
+        }
+      } catch {}
+      const code = getDeptCodeFromRoll(roll) || getDeptCodeFromEmail(r.email);
+      return code === dept;
+    }) : regs;
     console.log('[LIST] registrations for eventId', eventId, 'dept:', dept || 'ALL', 'total:', filtered.length);
     res.json(filtered);
   } catch (err) {
@@ -499,7 +767,7 @@ router.get('/mine', authMiddleware, async (req, res) => {
     if (!email) return res.status(401).json({ error: 'Unauthorized' });
 
     const rows = await allAsync(
-      `SELECT r.*, e.name as eventName, e.date as eventDate, e.venue as eventVenue, e.speaker as eventSpeaker, e.food as eventFood
+      `SELECT r.*, e.name as eventName, e.date as eventDate, e.endAt as eventEndAt, e.venue as eventVenue, e.speaker as eventSpeaker, e.food as eventFood
        FROM registrations r
        JOIN events e ON e.id = r.eventId
        WHERE r.email = ?

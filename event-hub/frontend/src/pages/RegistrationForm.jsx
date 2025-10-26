@@ -250,7 +250,7 @@
 
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
 
 export default function RegistrationForm() {
@@ -269,14 +269,26 @@ export default function RegistrationForm() {
   const [showDetails, setShowDetails] = useState(false)
   const [loading, setLoading] = useState(false)
   const [eventsLoading, setEventsLoading] = useState(true)
+  const { id: routeEventId } = useParams()
+  const location = useLocation()
+
+  // Immediately open modal and preselect event when route has :id
+  useEffect(() => {
+    if (!routeEventId) return
+    setShowModal(true)
+    setForm(prev => ({ ...prev, eventId: String(routeEventId) }))
+  }, [routeEventId])
 
   useEffect(() => {
     (async () => {
       try {
         setEventsLoading(true)
-        const { data } = await api.get('/api/events')
-        setEvents(data)
-        const adsRes = await api.get('/api/ads')
+        // Parallel API calls for faster loading
+        const [eventsRes, adsRes] = await Promise.all([
+          api.get('/api/events'),
+          api.get('/api/ads')
+        ])
+        setEvents(eventsRes.data)
         setAds(Array.isArray(adsRes.data) ? adsRes.data : [])
       } catch {
         setMessage('Failed to load events')
@@ -285,6 +297,37 @@ export default function RegistrationForm() {
       }
     })()
   }, [])
+
+  // If route contains an event ID, preselect it and open the modal when events are loaded
+  useEffect(() => {
+    if (!eventsLoading && routeEventId && events.length > 0) {
+      const found = events.find(ev => String(ev.id) === String(routeEventId))
+      if (found) {
+        setForm(prev => ({ ...prev, eventId: String(found.id) }))
+        setShowModal(true)
+      }
+    }
+  }, [eventsLoading, events, routeEventId])
+
+  // If user opens a per-event registration link, verify session via cookie-aware API and redirect to login only if unauthorized
+  useEffect(() => {
+    if (!routeEventId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await api.get('/api/auth/me')
+        // authenticated (via cookie or header); do nothing
+      } catch (e) {
+        if (cancelled) return
+        const status = e?.response?.status
+        if (status === 401) {
+          const from = location?.pathname + (location?.search || '')
+          navigate('/login', { state: { from }, replace: true })
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [routeEventId, location, navigate])
 
   useEffect(() => {
     if (!ads.length) return
@@ -319,13 +362,44 @@ export default function RegistrationForm() {
     setQr('')
     setLoading(true)
     try {
+      if (isAdmin) {
+        setMessage('Admins cannot register for events. Use the Share Registration Link to share with participants.')
+        return
+      }
+      // Client-side validation for required custom fields
+      try {
+        const reqErrors = []
+        if (Array.isArray(schema) && schema.length) {
+          for (const f of schema) {
+            if (!f?.required) continue
+            const val = answers[f.label]
+            const present = (
+              (f.type === 'checkbox') ? !!val :
+              (f.type === 'multiselect') ? Array.isArray(val) && val.length > 0 :
+              (f.type === 'image' || f.type === 'file') ? !!(val && (val.dataUrl || (typeof val === 'string' && val))) :
+              (val != null && String(val).trim().length > 0)
+            )
+            if (!present) reqErrors.push(f.label)
+          }
+        }
+        if (reqErrors.length) {
+          setLoading(false)
+          setMessage(`Please fill required fields: ${reqErrors.join(', ')}`)
+          return
+        }
+      } catch {}
       const authed = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
       const body = { ...form, email: authed?.email || form.email, name: authed?.name || form.name, answers }
       const { data } = await api.post('/api/registration', body)
       setMessage('Registered successfully!')
       setQr(data.qr)
       setPayload(data.payload)
-      navigate('/me', { replace: true })
+      // For direct event registration, go back to events page; otherwise go to user dashboard
+      if (routeEventId && !isAdmin) {
+        navigate('/register', { replace: true })
+      } else {
+        navigate('/me', { replace: true })
+      }
     } catch (e) {
       const status = e?.response?.status
       const errTxt = e?.response?.data?.error || e?.message
@@ -339,6 +413,7 @@ export default function RegistrationForm() {
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
   const authed = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
+  const isAdmin = !!authed && authed?.role === 'admin'
 
   const selectedEvent = useMemo(() => events.find(ev => String(ev.id) === String(form.eventId)) || null, [events, form.eventId])
   const schema = useMemo(() => {
@@ -360,8 +435,46 @@ export default function RegistrationForm() {
       <div className="dashboard-header">
         <h1>Event Registration</h1>
         <div className="header-subtitle">
-          Discover and register for upcoming events
+          {routeEventId && !isAdmin ? 
+            `Register for ${events.find(ev => String(ev.id) === String(routeEventId))?.name || 'this event'}` : 
+            'Discover and register for upcoming events'
+          }
         </div>
+        {routeEventId && isAdmin && (
+          <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:8}}>
+            <Link to={`/events/${routeEventId}`} className="view-all-btn" style={{textDecoration:'none'}}>View Event</Link>
+            <button
+              type="button"
+              className="view-all-btn"
+              onClick={async () => {
+                try {
+                  const url = `${window.location.origin}/events/${routeEventId}/register`
+                  const eventName = events.find(ev => String(ev.id) === String(routeEventId))?.name || 'Event'
+                  if (navigator.share) {
+                    await navigator.share({ 
+                      title: `${eventName} - Registration`, 
+                      text: `Join me at ${eventName}! Register here:`,
+                      url 
+                    })
+                  } else if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(url)
+                    alert('Registration link copied! Share this with friends so they can register directly.')
+                  }
+                } catch (err) {
+                  // Fallback: show the link in a prompt
+                  const url = `${window.location.origin}/events/${routeEventId}/register`
+                  prompt('Copy this registration link to share:', url)
+                }
+              }}
+              title="Copy/share registration link"
+            >
+              Share Registration Link
+            </button>
+            <span className="registered-badge" title="Admin access">
+              Admin Mode
+            </span>
+          </div>
+        )}
       </div>
 
       {message && (
@@ -434,7 +547,16 @@ export default function RegistrationForm() {
             {events.map(ev => {
               const isRegistered = registeredIds.has(String(ev.id))
               const isSelected = String(form.eventId) === String(ev.id)
-              
+              // Registration window checks
+              const now = Date.now()
+              const startMs = ev.startAt ? new Date(ev.startAt).getTime() : (ev.date ? new Date(ev.date).getTime() : NaN)
+              const started = Number.isFinite(startMs) && now >= startMs
+              const regCloseMs = ev.regCloseAt ? new Date(ev.regCloseAt).getTime() : NaN
+              const deadlinePassed = Number.isFinite(regCloseMs) && now > regCloseMs
+              const manualClosed = Number(ev.regClosed || 0) === 1
+              const allowAfterStart = Number(ev.allowAfterStart || 0) === 1
+              const registrationClosed = manualClosed || deadlinePassed || (started && !allowAfterStart)
+
               return (
                 <div 
                   key={ev.id} 
@@ -489,14 +611,23 @@ export default function RegistrationForm() {
                     
                     <div className="event-actions">
                       {isRegistered ? (
-                        <span className="registered-badge">
-                          Already Registered
+                        <span className="registered-badge">Already Registered</span>
+                      ) : registrationClosed ? (
+                        <span className="registered-badge" title={manualClosed ? 'Closed by admin' : (started ? 'Event started' : 'Deadline passed')}>
+                          Registration Closed
                         </span>
                       ) : (
                         <button 
                           type="button" 
                           className={`select-btn ${isSelected ? 'selected' : ''}`}
-                          onClick={() => { set('eventId', ev.id); setShowModal(true); }}
+                          onClick={() => { 
+                            set('eventId', ev.id); 
+                            if (!routeEventId) {
+                              navigate(`/events/${ev.id}/register`);
+                            } else {
+                              navigate(`/events/${ev.id}/register`); 
+                            }
+                          }}
                         >
                           {isSelected ? (
                             <>
@@ -526,7 +657,14 @@ export default function RegistrationForm() {
 
       {/* Registration Modal */}
       {showModal && form.eventId && !selectedIsRegistered && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowModal(false)
+          setShowDetails(false)
+          setForm(prev => ({ ...prev, eventId: '' }))
+          if (routeEventId && !isAdmin) {
+            navigate('/register')
+          }
+        }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Register for Event</h2>
@@ -555,7 +693,14 @@ export default function RegistrationForm() {
                 <button 
                   type="button" 
                   className="close-btn"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false)
+                    setShowDetails(false)
+                    setForm(prev => ({ ...prev, eventId: '' }))
+                    if (routeEventId && !isAdmin) {
+                      navigate('/register')
+                    }
+                  }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -657,7 +802,7 @@ export default function RegistrationForm() {
                         {f.type === 'text' && (
                           <div className="form-group">
                             <label className="form-label">
-                              {f.label}
+                              {f.label}{f.required ? ' *' : ''}
                               <input 
                                 className="form-input"
                                 value={answers[f.label] || ''} 
@@ -670,7 +815,7 @@ export default function RegistrationForm() {
                         {f.type === 'select' && Array.isArray(f.options) && (
                           <div className="form-group">
                             <label className="form-label">
-                              {f.label}
+                              {f.label}{f.required ? ' *' : ''}
                               <select 
                                 className="form-input"
                                 value={answers[f.label] || ''} 
@@ -684,7 +829,7 @@ export default function RegistrationForm() {
                         )}
                         {f.type === 'multiselect' && Array.isArray(f.options) && (
                           <div className="form-group">
-                            <label className="form-label">{f.label}</label>
+                            <label className="form-label">{f.label}{f.required ? ' *' : ''}</label>
                             <div className="checkbox-grid">
                               {f.options.map(opt => {
                                 const values = Array.isArray(answers[f.label]) ? answers[f.label] : []
@@ -719,7 +864,44 @@ export default function RegistrationForm() {
                                 onChange={e => setAnswer(f.label, e.target.checked)} 
                               />
                               <span className="checkbox-custom"></span>
-                              <span className="checkbox-text">{f.label}</span>
+                              <span className="checkbox-text">{f.label}{f.required ? ' *' : ''}</span>
+                            </label>
+                          </div>
+                        )}
+                        {f.type === 'image' && (
+                          <div className="form-group">
+                            <label className="form-label">
+                              {f.label}{f.required ? ' *' : ''}
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="form-input"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) { setAnswer(f.label, ''); return }
+                                  const reader = new FileReader()
+                                  reader.onload = () => setAnswer(f.label, { name: file.name, type: file.type, dataUrl: String(reader.result||'') })
+                                  reader.readAsDataURL(file)
+                                }}
+                              />
+                            </label>
+                          </div>
+                        )}
+                        {f.type === 'file' && (
+                          <div className="form-group">
+                            <label className="form-label">
+                              {f.label}{f.required ? ' *' : ''}
+                              <input 
+                                type="file" 
+                                className="form-input"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) { setAnswer(f.label, ''); return }
+                                  const reader = new FileReader()
+                                  reader.onload = () => setAnswer(f.label, { name: file.name, type: file.type, dataUrl: String(reader.result||'') })
+                                  reader.readAsDataURL(file)
+                                }}
+                              />
                             </label>
                           </div>
                         )}
@@ -733,14 +915,21 @@ export default function RegistrationForm() {
                 <button 
                   type="button" 
                   className="cancel-btn"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false)
+                    setShowDetails(false)
+                    setForm(prev => ({ ...prev, eventId: '' }))
+                    if (routeEventId && !isAdmin) {
+                      navigate('/register')
+                    }
+                  }}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   className="submit-btn primary-btn"
-                  disabled={loading}
+                  disabled={loading || isAdmin}
                 >
                   {loading ? (
                     <>
@@ -752,7 +941,7 @@ export default function RegistrationForm() {
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      <span>Complete Registration</span>
+                      <span>{isAdmin ? 'Admins cannot register' : 'Complete Registration'}</span>
                     </>
                   )}
                 </button>

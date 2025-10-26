@@ -80,6 +80,13 @@ export function initDb() {
       const hasPoster = Array.isArray(rows) && rows.some(r => r.name === 'poster');
       const hasCreatedBy = Array.isArray(rows) && rows.some(r => r.name === 'createdBy');
       const hasDescription = Array.isArray(rows) && rows.some(r => r.name === 'description');
+      const hasQrEnabled = Array.isArray(rows) && rows.some(r => r.name === 'qrEnabled');
+      const hasArchived = Array.isArray(rows) && rows.some(r => r.name === 'archived');
+      const hasStartAt = Array.isArray(rows) && rows.some(r => r.name === 'startAt');
+      const hasEndAt = Array.isArray(rows) && rows.some(r => r.name === 'endAt');
+      const hasRegCap = Array.isArray(rows) && rows.some(r => r.name === 'regCap');
+      const hasRegCapEnforced = Array.isArray(rows) && rows.some(r => r.name === 'regCapEnforced');
+      const hasAllowAfterStart = Array.isArray(rows) && rows.some(r => r.name === 'allowAfterStart');
       if (!hasFormSchema) {
         db.run(`ALTER TABLE events ADD COLUMN formSchema TEXT`, () => {});
       }
@@ -92,7 +99,50 @@ export function initDb() {
       if (!hasDescription) {
         db.run(`ALTER TABLE events ADD COLUMN description TEXT`, () => {});
       }
+      if (!hasQrEnabled) {
+        db.run(`ALTER TABLE events ADD COLUMN qrEnabled INTEGER DEFAULT 0`, () => {});
+      }
+      if (!hasArchived) {
+        db.run(`ALTER TABLE events ADD COLUMN archived INTEGER DEFAULT 0`, () => {});
+      }
+      if (!hasStartAt) {
+        db.run(`ALTER TABLE events ADD COLUMN startAt TEXT`, () => {});
+      }
+      if (!hasEndAt) {
+        db.run(`ALTER TABLE events ADD COLUMN endAt TEXT`, () => {});
+      }
+      if (!hasRegCap) {
+        db.run(`ALTER TABLE events ADD COLUMN regCap INTEGER`, () => {});
+      }
+      if (!hasRegCapEnforced) {
+        db.run(`ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0`, () => {});
+      }
+      if (!hasAllowAfterStart) {
+        db.run(`ALTER TABLE events ADD COLUMN allowAfterStart INTEGER DEFAULT 0`, () => {});
+      }
     });
+
+    // QR logs: track all QR generation attempts
+    db.run(`CREATE TABLE IF NOT EXISTS qr_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      eventId INTEGER,
+      regId INTEGER,
+      userEmail TEXT,
+      status TEXT,
+      detail TEXT,
+      createdAt TEXT DEFAULT (datetime('now'))
+    );`);
+
+    // Audit logs: track admin actions
+    db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actorEmail TEXT,
+      action TEXT,
+      targetType TEXT,
+      targetId INTEGER,
+      meta TEXT,
+      createdAt TEXT DEFAULT (datetime('now'))
+    );`);
   });
 }
 
