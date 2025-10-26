@@ -21,6 +21,34 @@ router.get('/all', authMiddleware, isSuperAdmin, async (_req, res) => {
   }
 });
 
+// Admin: toggle registration QR availability per event
+// POST /api/events/:id/qr-toggle  Body: { enabled: boolean }
+router.post('/:id/qr-toggle', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+
+    // Ensure column exists
+    try { await runAsync("ALTER TABLE events ADD COLUMN regQrEnabled INTEGER DEFAULT 0"); } catch {}
+
+    const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+    const ev = rows[0];
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+
+    const me = (req.user?.email || '').toLowerCase();
+    const role = req.user?.role;
+    if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const enabled = req.body?.enabled === true || String(req.body?.enabled) === 'true' ? 1 : 0;
+    await runAsync('UPDATE events SET regQrEnabled = ? WHERE id = ?', [enabled, id]);
+    res.json({ success: true, regQrEnabled: enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: toggle registration open/closed for an event
 // POST /api/events/:id/reg-toggle  Body: { closed: boolean }
 router.post('/:id/reg-toggle', authMiddleware, isAdmin, async (req, res) => {
@@ -241,12 +269,13 @@ router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
     const email = req.user?.email || '';
+    const role = req.user?.role;
 
     // enforce ownership: only the creator can delete this event
     const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
     const ev = rows[0];
     if (!ev) return res.status(404).json({ error: 'Event not found' });
-    if (ev.createdBy && ev.createdBy !== email) {
+    if (role !== 'superadmin' && ev.createdBy && ev.createdBy !== email) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
