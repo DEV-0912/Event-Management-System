@@ -4,7 +4,7 @@
 
 // export default function RegistrationForm() {
 //   const [events, setEvents] = useState([])
-//   const [form, setForm] = useState({ name: '', email: '', contact: '', eventId: '' })
+//   const [form, setForm] = useState({ name: '', email: '', contact: '', eventId: '', paymentId: '' })
 //   const [message, setMessage] = useState('')
 //   const [qr, setQr] = useState('')
 //   const [payload, setPayload] = useState('')
@@ -255,7 +255,7 @@ import { api } from '../api'
 
 export default function RegistrationForm() {
   const [events, setEvents] = useState([])
-  const [form, setForm] = useState({ name: '', email: '', contact: '', eventId: '' })
+  const [form, setForm] = useState({ name: '', email: '', contact: '', eventId: '', paymentId: '' })
   const [message, setMessage] = useState('')
   const [qr, setQr] = useState('')
   const [payload, setPayload] = useState('')
@@ -269,6 +269,10 @@ export default function RegistrationForm() {
   const [showDetails, setShowDetails] = useState(false)
   const [loading, setLoading] = useState(false)
   const [eventsLoading, setEventsLoading] = useState(true)
+  
+  // Get authentication status and check if user is admin
+  const authed = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
+  const isAdmin = !!authed && (authed?.role === 'admin' || authed?.role === 'superadmin')
   const { id: routeEventId } = useParams()
   const location = useLocation()
 
@@ -367,8 +371,8 @@ export default function RegistrationForm() {
     setQr('')
     setLoading(true)
     try {
-      if (isAdmin) {
-        setMessage('Admins cannot register for events. Use the Share Registration Link to share with participants.')
+      if (isAdmin && !form.paymentId) {
+        setMessage('Please enter a payment ID to register as admin')
         return
       }
       // Client-side validation for required custom fields
@@ -417,8 +421,6 @@ export default function RegistrationForm() {
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
-  const authed = (() => { try { return JSON.parse(localStorage.getItem('auth_user')||'null') } catch { return null } })()
-  const isAdmin = !!authed && (authed?.role === 'admin' || authed?.role === 'superadmin')
 
   const selectedEvent = useMemo(() => events.find(ev => String(ev.id) === String(form.eventId)) || null, [events, form.eventId])
   const schema = useMemo(() => {
@@ -787,13 +789,30 @@ export default function RegistrationForm() {
                     <label className="form-label">
                       Contact Number
                       <input 
+                        type="tel" 
                         className="form-input"
                         value={form.contact} 
                         onChange={e => set('contact', e.target.value)} 
-                        placeholder="Optional phone number"
+                        placeholder="Enter your contact number"
+                        required
                       />
                     </label>
                   </div>
+                  {isAdmin && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        Payment ID (Required for Admin)
+                        <input 
+                          type="text" 
+                          className="form-input"
+                          value={form.paymentId} 
+                          onChange={e => set('paymentId', e.target.value)} 
+                          placeholder="Enter payment reference ID"
+                          required
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -934,7 +953,7 @@ export default function RegistrationForm() {
                 <button 
                   type="submit" 
                   className="submit-btn primary-btn"
-                  disabled={loading || isAdmin}
+                  disabled={loading}
                 >
                   {loading ? (
                     <>
@@ -946,7 +965,7 @@ export default function RegistrationForm() {
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      <span>{isAdmin ? 'Admins cannot register' : 'Complete Registration'}</span>
+                      <span>Complete Registration{isAdmin ? ' (Admin)' : ''}</span>
                     </>
                   )}
                 </button>
@@ -1202,23 +1221,40 @@ export default function RegistrationForm() {
           right: 0;
           bottom: 0;
           background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(5px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
+          z-index: 9999;
           padding: 20px;
-          backdrop-filter: blur(5px);
+          opacity: 0;
+          animation: fadeIn 0.3s forwards;
+        }
+        
+        @keyframes fadeIn {
+          to { opacity: 1; }
         }
 
         .modal-content {
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 20px;
+          background: white;
+          border-radius: 16px;
           width: 100%;
-          max-width: 800px;
+          max-width: 600px;
           max-height: 90vh;
           overflow-y: auto;
-          box-shadow: var(--shadow);
+          padding: 32px;
+          position: relative;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+          transform: translateY(20px);
+          opacity: 0;
+          animation: slideUp 0.3s 0.1s forwards;
+        }
+        
+        @keyframes slideUp {
+          to { 
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
 
         .modal-header {

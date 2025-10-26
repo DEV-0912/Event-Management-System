@@ -79,6 +79,10 @@ export default function SuperadminDashboard() {
       ])
       setEvents(Array.isArray(all.data) ? all.data : [])
       setPerAdminStats(Array.isArray(perAdmin.data) ? perAdmin.data : [])
+    } catch (e) {
+      // Backend may not be updated in this environment; avoid throwing in UI
+      setEvents([])
+      setPerAdminStats([])
     } finally {
       setLoading(false)
     }
@@ -94,6 +98,16 @@ export default function SuperadminDashboard() {
       setExpandedSections(prev => ({ ...prev, [`logs_${evId}`]: true }))
     } finally {
       setBusy(b => ({ ...b, ['logs_'+evId]: false }))
+    }
+  }
+
+  const toggleQr = async (evId, enabled) => {
+    setBusy(b => ({ ...b, ['qr_'+evId]: true }))
+    try {
+      await api.post(`/api/events/${evId}/qr-toggle`, { enabled })
+      await fetchEvents()
+    } finally {
+      setBusy(b => ({ ...b, ['qr_'+evId]: false }))
     }
   }
 
@@ -258,6 +272,21 @@ export default function SuperadminDashboard() {
                   )}
                   View Registrations ({regsByEvent[ev.id]?.length || 0})
                 </button>
+
+                <div className="qr-toggle">
+                  <label className="switch">
+                    <input 
+                      type="checkbox" 
+                      checked={Number(ev.regQrEnabled) === 1}
+                      onChange={e => toggleQr(ev.id, e.target.checked)}
+                      disabled={!!busy['qr_'+ev.id]}
+                    />
+                    <span className="slider" />
+                  </label>
+                  <span className="qr-label">
+                    {Number(ev.regQrEnabled) === 1 ? 'QR Enabled' : 'QR Disabled'}
+                  </span>
+                </div>
               </div>
 
               {/* Logs Section */}
@@ -358,7 +387,7 @@ export default function SuperadminDashboard() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .superadmin-dashboard {
           max-width: 1200px;
           margin: 0 auto;
@@ -647,6 +676,65 @@ export default function SuperadminDashboard() {
           border-top: 2px solid currentColor;
           border-radius: 50%;
           animation: spin 1s linear infinite;
+        }
+
+        /* QR Toggle */
+        .qr-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 40px;
+          height: 22px;
+        }
+
+        .switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: var(--border);
+          transition: .2s;
+          border-radius: 999px;
+        }
+
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 16px;
+          width: 16px;
+          left: 3px;
+          top: 3px;
+          background-color: white;
+          transition: .2s;
+          border-radius: 50%;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .switch input:checked + .slider {
+          background-color: var(--primary);
+        }
+
+        .switch input:checked + .slider:before {
+          transform: translateX(18px);
+        }
+
+        .qr-label {
+          font-size: 12px;
+          color: var(--muted);
+          min-width: 86px;
         }
 
         /* Data Sections */

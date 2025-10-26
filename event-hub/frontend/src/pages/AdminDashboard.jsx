@@ -1324,6 +1324,16 @@
 //           transition: all 0.2s;
 //         }
 
+  const toggleQr = async (ev) => {
+    try {
+      const nextEnabled = !(Number(ev.regQrEnabled) === 1)
+      await api.post(`/api/events/${ev.id}/qr-toggle`, { enabled: nextEnabled })
+      await load()
+    } catch (e) {
+      setMessage(e?.response?.data?.error || 'Failed to toggle QR')
+    }
+  }
+
 //         .close-btn:hover {
 //           background: rgba(255, 255, 255, 0.1);
 //           color: var(--text);
@@ -1946,6 +1956,17 @@ export default function AdminDashboard() {
                       >
                         {Number(ev.regClosed || 0) === 1 ? 'Open Reg' : 'Close Reg'}
                       </button>
+                      <div className="qr-toggle">
+                        <label className="switch" title={Number(ev.regQrEnabled) === 1 ? 'Disable QR' : 'Enable QR'}>
+                          <input 
+                            type="checkbox" 
+                            checked={Number(ev.regQrEnabled) === 1}
+                            onChange={() => toggleQr(ev)}
+                          />
+                          <span className="slider" />
+                        </label>
+                        <span className="qr-label">{Number(ev.regQrEnabled) === 1 ? 'QR Enabled' : 'QR Disabled'}</span>
+                      </div>
                       <button 
                         className="toggle-regs-btn" 
                         onClick={() => toggleRegs(ev.id)}
@@ -2199,11 +2220,11 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                             </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
