@@ -199,6 +199,20 @@ router.get('/', async (_req, res) => {
   }
 });
 
+// GET /api/events/:id → get single event by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
+    const ev = rows[0];
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+    res.json(ev);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/events/mine → list only events created by current admin
 router.get('/mine', authMiddleware, isAdmin, async (req, res) => {
   try {
