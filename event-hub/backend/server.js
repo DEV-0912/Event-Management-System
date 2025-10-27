@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js';
 import adsRouter from './routes/ads.js';
 import { initDb, allAsync, runAsync } from './db.js';
 import { authMiddleware, isAdmin } from './utils/auth.js';
+import QRCode from 'qrcode';
 
 dotenv.config();
 
@@ -138,6 +139,28 @@ const mountAdminEventRoutes = (base) => {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // GET {base}/events/:id/qr-link  -> { registrationLink, qrCode }
+  app.get(`${base}/events/:id/qr-link`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'Invalid id' });
+      const rows = await allAsync('SELECT createdBy FROM events WHERE id = ?', [id]);
+      const ev = rows[0];
+      if (!ev) return res.status(404).json({ error: 'Event not found' });
+      const me = (req.user?.email || '').toLowerCase();
+      const role = req.user?.role;
+      if (!(role === 'superadmin' || (ev.createdBy && me === String(ev.createdBy).toLowerCase()))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+      const registrationLink = `${origin}/events/${id}/register`;
+      const qrCode = await QRCode.toDataURL(registrationLink, { errorCorrectionLevel: 'M', type: 'image/png', margin: 2, scale: 8 });
+      res.json({ registrationLink, qrCode });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 };
 
 // Mount at legacy '/api' and, if applicable, at '{BASE_PATH}/api'
@@ -157,6 +180,132 @@ if (API_PREFIX !== '/api') {
   app.use(`${API_PREFIX}/registration`, registrationsRouter);
   app.use(`${API_PREFIX}/ads`, adsRouter);
 }
+
+// Additional admin/superadmin overview and ownership routes
+const mountAdminOverviewRoutes = (base) => {
+  // Get overview stats for admin
+  app.get(`${base}/events/overview`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const userEmail = String(req.user?.email || '').toLowerCase();
+      const eventsCount = await allAsync(
+        'SELECT COUNT(*) as count FROM events WHERE createdBy = ?',
+        [userEmail]
+      );
+      const regsCount = await allAsync(
+        `SELECT COUNT(*) as count 
+         FROM registrations r 
+         JOIN events e ON r.eventId = e.id 
+         WHERE e.createdBy = ?`,
+        [userEmail]
+      );
+      const checkedInCount = await allAsync(
+        `SELECT COUNT(*) as count 
+         FROM registrations r 
+         JOIN events e ON r.eventId = e.id 
+         WHERE e.createdBy = ? AND r.checkedIn = 1`,
+        [userEmail]
+      );
+      res.json({
+        totalEvents: Number(eventsCount?.[0]?.count || 0),
+        totalRegistrations: Number(regsCount?.[0]?.count || 0),
+        totalCheckedIn: Number(checkedInCount?.[0]?.count || 0)
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get events created by current admin
+  app.get(`${base}/events/mine`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const userEmail = String(req.user?.email || '').toLowerCase();
+      const events = await allAsync(
+        'SELECT * FROM events WHERE createdBy = ? ORDER BY date DESC',
+        [userEmail]
+      );
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get unowned events (for claiming)
+  app.get(`${base}/events/unowned`, authMiddleware, isAdmin, async (_req, res) => {
+    try {
+      const events = await allAsync(
+        'SELECT * FROM events WHERE createdBy IS NULL OR createdBy = "" ORDER BY date DESC',
+        []
+      );
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Claim an unowned event
+  app.post(`${base}/events/:id/claim`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const userEmail = String(req.user?.email || '').toLowerCase();
+      if (!id) return res.status(400).json({ error: 'Invalid id' });
+      const events = await allAsync(
+        'SELECT * FROM events WHERE id = ? AND (createdBy IS NULL OR createdBy = "")',
+        [id]
+      );
+      if (!events?.length) {
+        return res.status(404).json({ error: 'Event not found or already claimed' });
+      }
+      await runAsync(
+        'UPDATE events SET createdBy = ? WHERE id = ?',
+        [userEmail, id]
+      );
+      res.json({ success: true, message: 'Event claimed successfully' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Super admin: Get all events
+  app.get(`${base}/events/all`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const events = await allAsync('SELECT * FROM events ORDER BY date DESC', []);
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Super admin: Get overview stats for all admins
+  app.get(`${base}/events/overview/all`, authMiddleware, isAdmin, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const stats = await allAsync(
+        `SELECT 
+           e.createdBy as adminEmail,
+           COUNT(DISTINCT e.id) as totalEvents,
+           COUNT(r.id) as totalRegistrations,
+           SUM(CASE WHEN r.checkedIn = 1 THEN 1 ELSE 0 END) as totalCheckedIn
+         FROM events e
+         LEFT JOIN registrations r ON e.id = r.eventId
+         WHERE e.createdBy IS NOT NULL AND e.createdBy != ''
+         GROUP BY e.createdBy
+         ORDER BY totalEvents DESC`
+      );
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+};
+
+// Mount at legacy '/api' and, if applicable, at '{BASE_PATH}/api'
+mountAdminOverviewRoutes('/api');
+if (API_PREFIX !== '/api') mountAdminOverviewRoutes(API_PREFIX);
 
 // Static serving (optional for any assets)
 const __filename = fileURLToPath(import.meta.url);
