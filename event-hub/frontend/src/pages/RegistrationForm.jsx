@@ -403,6 +403,22 @@ export default function RegistrationForm() {
       setMessage('Registered successfully!')
       setQr(data.qr)
       setPayload(data.payload)
+      
+      // Close the modal on successful registration
+      setShowModal(false)
+      setShowDetails(false)
+      setForm(prev => ({ ...prev, eventId: '' }))
+      setAnswers({})
+      
+      // Refresh registrations list
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (token) {
+          const { data: regsData } = await api.get('/api/registration/mine')
+          setMyRegs(regsData || [])
+        }
+      } catch {}
+      
       // For direct event registration, go back to events page; otherwise go to user dashboard
       if (routeEventId && !isAdmin) {
         navigate('/register', { replace: true })
@@ -483,19 +499,6 @@ export default function RegistrationForm() {
           </div>
         )}
       </div>
-
-      {message && (
-        <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'} fade-in`}>
-          <div className="alert-content">
-            <span>{message}</span>
-            <button className="alert-close" onClick={() => setMessage('')}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Advertisements Carousel */}
       {!isAdmin && ads.length > 0 && (
@@ -715,6 +718,20 @@ export default function RegistrationForm() {
                 </button>
               </div>
             </div>
+
+            {/* Error/Success Message inside Modal */}
+            {message && (
+              <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'} fade-in`} style={{margin: '20px 24px 0'}}>
+                <div className="alert-content">
+                  <span>{message}</span>
+                  <button className="alert-close" onClick={() => setMessage('')}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Event Details */}
             {selectedEvent && showDetails && (

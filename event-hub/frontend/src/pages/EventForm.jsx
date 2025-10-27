@@ -107,9 +107,11 @@
 
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 
 export default function EventForm() {
+  const navigate = useNavigate()
   const [form, setForm] = useState({ 
     name: '', 
     date: '', 
@@ -159,6 +161,7 @@ export default function EventForm() {
       }
       await api.post('/api/events', payload)
       setMessage('Event created successfully!')
+      // navigate('/new')
       // Reset form
       setForm({ name: '', date: '', venue: '', speaker: '', food: '' })
       setFields([])
@@ -230,20 +233,6 @@ export default function EventForm() {
           Set up a new event with custom registration fields
         </div>
       </div>
-
-      {message && (
-        <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'} fade-in`}>
-          <div className="alert-content">
-            <span>{message}</span>
-            <button className="alert-close" onClick={() => setMessage('')}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       <form onSubmit={submit} className="event-form">
         <div className="form-section">
           <div className="section-header">
@@ -534,6 +523,32 @@ export default function EventForm() {
             )}
           </div>
         </div>
+
+
+      {message && (
+        <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'} fade-in`}>
+          <div className="alert-content">
+            <div className="alert-icon">
+              {message.includes('successfully') ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <span className="alert-message">{message}</span>
+            <button className="alert-close" onClick={() => setMessage('')}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
 
         <div className="form-submit">
           <button 
@@ -913,48 +928,64 @@ export default function EventForm() {
 
         /* Alerts */
         .alert {
-          background: rgba(160, 107, 43, 0.12);
-          color: #2b2116;
-          padding: 12px 16px;
-          border: 1px solid rgba(160, 107, 43, 0.28);
-          border-radius: 10px;
-          margin-bottom: 20px;
+          background: rgba(251, 191, 36, 0.15);
+          color: #92400e;
+          padding: 16px 20px;
+          border: 1px solid rgba(251, 191, 36, 0.4);
+          border-radius: 12px;
+          margin-bottom: 24px;
+          backdrop-filter: blur(10px);
         }
 
         .alert-success {
-          background: rgba(34, 197, 94, 0.12);
-          color: #166534;
-          border-color: rgba(34, 197, 94, 0.28);
+          background: rgba(34, 197, 94, 0.15);
+          color: #15803d;
+          border-color: rgba(34, 197, 94, 0.4);
         }
 
         .alert-error {
-          background: rgba(239, 68, 68, 0.12);
-          color: #991b1b;
-          border-color: rgba(239, 68, 68, 0.28);
+          background: rgba(239, 68, 68, 0.15);
+          color: #b91c1c;
+          border-color: rgba(239, 68, 68, 0.4);
         }
 
         .alert-content {
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          gap: 12px;
           width: 100%;
         }
 
-        .alert-close {
-          background: none;
-          border: none;
-          color: inherit;
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 4px;
+        .alert-icon {
+          flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background-color 0.2s;
+        }
+
+        .alert-message {
+          flex: 1;
+          font-weight: 500;
+          font-size: 0.95rem;
+        }
+
+        .alert-close {
+          background: rgba(0, 0, 0, 0.08);
+          border: none;
+          color: inherit;
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          flex-shrink: 0;
         }
 
         .alert-close:hover {
-          background: rgba(0, 0, 0, 0.1);
+          background: rgba(0, 0, 0, 0.15);
+          transform: scale(1.05);
         }
 
         /* Loading Spinner */

@@ -1172,7 +1172,7 @@ export default function Home() {
             <div className="section-actions" style={{gap:12, marginTop:12, display:'flex', justifyContent:'center', flexWrap:'wrap'}}>
               <Link to="/new"><button className="view-all-btn">Create Event</button></Link>
               <Link to="/checkin"><button className="view-all-btn">Check-In</button></Link>
-              <Link to="/ads"><button className="view-all-btn">Manage Ads</button></Link>
+              {/* <Link to="/ads"><button className="view-all-btn">Manage Ads</button></Link> */}
             </div>
           </div>
         </section>
