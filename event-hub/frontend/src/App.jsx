@@ -9,6 +9,7 @@ import SuperadminDashboard from './pages/SuperadminDashboard.jsx'
 // // import Login from './pages/Login.jsx'
 // // import UserDashboard from './pages/UserDashboard.jsx'
 // // import Home from './pages/Home.jsx'
+import { useEffect, useState } from 'react'
 
 // // function RequireAuth({ children }) {
 // //   const location = useLocation()
@@ -74,6 +75,37 @@ function RequireUser({ children }) {
 export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [canInstall, setCanInstall] = useState(false)
+  const [pwaPrompt, setPwaPrompt] = useState(null)
+
+  useEffect(() => {
+    const onBeforeInstall = (e) => {
+      e.preventDefault()
+      setPwaPrompt(e)
+      setCanInstall(true)
+    }
+    const onInstalled = () => {
+      setPwaPrompt(null)
+      setCanInstall(false)
+    }
+    window.addEventListener('beforeinstallprompt', onBeforeInstall)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
+  }, [])
+
+  const installApp = async () => {
+    if (!pwaPrompt) return
+    pwaPrompt.prompt()
+    try {
+      await pwaPrompt.userChoice
+    } finally {
+      setPwaPrompt(null)
+      setCanInstall(false)
+    }
+  }
   
   const user = (() => {
     try {
@@ -130,6 +162,15 @@ export default function App() {
                   </svg>
                   <span className="nav-text">Home</span>
                 </Link>
+                {canInstall && (
+                  <button onClick={installApp} className="nav-link" type="button">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 3v12m0 0l4-4m-4 4l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M5 21h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="nav-text">Install</span>
+                  </button>
+                )}
                 
                 {isAuthed && (
                   <>

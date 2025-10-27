@@ -1,4 +1,11 @@
 // // import { useEffect, useState } from 'react'
+export default function SuperadminDashboard() {
+  return (
+    <div className="page-wrap">
+      <h1>Superadmin</h1>
+    </div>
+  )
+}
 // // import { api } from '../api'
 
 // // export default function SuperadminDashboard() {
