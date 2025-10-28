@@ -1,6 +1,7 @@
 import express from 'express';
 import { allAsync, runAsync } from '../db.js';
 import { authMiddleware, isAdmin, isSuperAdmin } from '../utils/auth.js';
+import QRCode from 'qrcode';
 
 const router = express.Router();
 
@@ -229,6 +230,44 @@ router.get('/overview', authMiddleware, isAdmin, async (req, res) => {
     const totalRegistrations = regsRow?.[0]?.totalRegs || 0;
     const totalCheckedIn = regsRow?.[0]?.totalCheckedIn || 0;
     res.json({ totalEvents, totalRegistrations, totalCheckedIn });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/events/:id/qr → generate and download QR code for event registration
+router.get('/:id/qr', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    
+    const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
+    const ev = rows[0];
+    if (!ev) return res.status(404).json({ error: 'Event not found' });
+    
+    // Check ownership
+    const email = req.user?.email || '';
+    const role = req.user?.role;
+    if (role !== 'superadmin' && ev.createdBy && ev.createdBy !== email) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    // Generate registration link
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3224';
+    const registrationUrl = `${frontendUrl}/register/${id}`;
+    
+    // Generate QR code as PNG buffer
+    const qrBuffer = await QRCode.toBuffer(registrationUrl, {
+      type: 'png',
+      width: 500,
+      margin: 2,
+      errorCorrectionLevel: 'M'
+    });
+    
+    // Set headers for file download
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="event_${id}_qr.png"`);
+    res.send(qrBuffer);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
