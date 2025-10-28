@@ -10,6 +10,39 @@ router.post('/', authMiddleware, isAdmin, async (req, res) => {
     const { name, date, venue, speaker, food, formSchema, poster, description } = req.body;
     if (!name || !date || !venue) {
       return res.status(400).json({ error: 'name, date and venue are required' });
+    }
+    // Ensure required registration fields: Roll Number and Payment ID
+    let schemaArr = [];
+    try {
+      if (Array.isArray(formSchema)) schemaArr = formSchema;
+      else if (typeof formSchema === 'string' && formSchema.trim()) schemaArr = JSON.parse(formSchema);
+    } catch {}
+    const hasRoll = schemaArr.some(f => /roll/i.test(String(f?.label||'')));
+    const hasPayment = schemaArr.some(f => /payment/i.test(String(f?.label||'')));
+    if (!hasRoll) schemaArr.push({ id: (schemaArr.length+1), label: 'Roll Number', type: 'text', required: true });
+    if (!hasPayment) schemaArr.push({ id: (schemaArr.length+1), label: 'Payment ID', type: 'text', required: true });
+
+    const createdBy = req.user?.email || null;
+    const result = await runAsync(
+      'INSERT INTO events (name, date, venue, speaker, food, formSchema, poster, createdBy, description) VALUES (?,?,?,?,?,?,?,?,?)',
+      [name, date, venue, speaker || '', food || '', schemaArr.length ? JSON.stringify(schemaArr) : null, poster || null, createdBy, description || null]
+    );
+    // Optionally set registration capacity at creation
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0"); } catch {}
+    try { await runAsync("ALTER TABLE events ADD COLUMN regCap INTEGER DEFAULT 0"); } catch {}
+    if (req.body) {
+      const enforced = req.body?.regCapEnforced === true || String(req.body?.regCapEnforced) === 'true' ? 1 : 0;
+      const capNum = Math.max(0, Number(req.body?.regCap || 0)) | 0;
+      if (enforced || capNum > 0) {
+        await runAsync('UPDATE events SET regCapEnforced = ?, regCap = ? WHERE id = ?', [enforced, capNum, result.id]);
+      }
+    }
+    const created = await allAsync('SELECT * FROM events WHERE id = ?', [result.id]);
+    res.status(201).json(created[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Superadmin: list all events
 router.get('/all', authMiddleware, isSuperAdmin, async (_req, res) => {
@@ -155,39 +188,6 @@ router.post('/:id/claim', authMiddleware, isAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-    }
-    // Ensure required registration fields: Roll Number and Payment ID
-    let schemaArr = [];
-    try {
-      if (Array.isArray(formSchema)) schemaArr = formSchema;
-      else if (typeof formSchema === 'string' && formSchema.trim()) schemaArr = JSON.parse(formSchema);
-    } catch {}
-    const hasRoll = schemaArr.some(f => /roll/i.test(String(f?.label||'')));
-    const hasPayment = schemaArr.some(f => /payment/i.test(String(f?.label||'')));
-    if (!hasRoll) schemaArr.push({ id: (schemaArr.length+1), label: 'Roll Number', type: 'text', required: true });
-    if (!hasPayment) schemaArr.push({ id: (schemaArr.length+1), label: 'Payment ID', type: 'text', required: true });
-
-    const createdBy = req.user?.email || null;
-    const result = await runAsync(
-      'INSERT INTO events (name, date, venue, speaker, food, formSchema, poster, createdBy, description) VALUES (?,?,?,?,?,?,?,?,?)',
-      [name, date, venue, speaker || '', food || '', schemaArr.length ? JSON.stringify(schemaArr) : null, poster || null, createdBy, description || null]
-    );
-    // Optionally set registration capacity at creation
-    try { await runAsync("ALTER TABLE events ADD COLUMN regCapEnforced INTEGER DEFAULT 0"); } catch {}
-    try { await runAsync("ALTER TABLE events ADD COLUMN regCap INTEGER DEFAULT 0"); } catch {}
-    if (req.body) {
-      const enforced = req.body?.regCapEnforced === true || String(req.body?.regCapEnforced) === 'true' ? 1 : 0;
-      const capNum = Math.max(0, Number(req.body?.regCap || 0)) | 0;
-      if (enforced || capNum > 0) {
-        await runAsync('UPDATE events SET regCapEnforced = ?, regCap = ? WHERE id = ?', [enforced, capNum, result.id]);
-      }
-    }
-    const created = await allAsync('SELECT * FROM events WHERE id = ?', [result.id]);
-    res.status(201).json(created[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // GET /api/events → list events
 router.get('/', async (_req, res) => {
@@ -199,21 +199,7 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// GET /api/events/:id → get single event by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'Invalid id' });
-    const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
-    const ev = rows[0];
-    if (!ev) return res.status(404).json({ error: 'Event not found' });
-    res.json(ev);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/events/mine → list only events created by current admin
+// GET /api/events/mine → list only events created by current admin (MUST BE BEFORE /:id)
 router.get('/mine', authMiddleware, isAdmin, async (req, res) => {
   try {
     const email = req.user?.email || '';
@@ -225,7 +211,7 @@ router.get('/mine', authMiddleware, isAdmin, async (req, res) => {
   }
 });
 
-// GET /api/events/overview → admin metrics for own events
+// GET /api/events/overview → admin metrics for own events (MUST BE BEFORE /:id)
 router.get('/overview', authMiddleware, isAdmin, async (req, res) => {
   try {
     const email = req.user?.email || '';
@@ -248,30 +234,15 @@ router.get('/overview', authMiddleware, isAdmin, async (req, res) => {
   }
 });
 
-// GET /api/events/unowned → list events without createdBy (legacy)
-router.get('/unowned', authMiddleware, isAdmin, async (_req, res) => {
-  try {
-    const rows = await allAsync('SELECT * FROM events WHERE createdBy IS NULL ORDER BY date DESC');
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/events/:id/claim → set createdBy if not already set
-router.post('/:id/claim', authMiddleware, isAdmin, async (req, res) => {
+// GET /api/events/:id → get single event by ID (MUST BE AFTER specific routes)
+router.get('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
     const rows = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
     const ev = rows[0];
     if (!ev) return res.status(404).json({ error: 'Event not found' });
-    if (ev.createdBy && ev.createdBy !== req.user?.email) {
-      return res.status(409).json({ error: 'Event already claimed by another admin' });
-    }
-    await runAsync('UPDATE events SET createdBy = ? WHERE id = ?', [req.user?.email || null, id]);
-    const updated = await allAsync('SELECT * FROM events WHERE id = ?', [id]);
-    res.json(updated[0]);
+    res.json(ev);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
