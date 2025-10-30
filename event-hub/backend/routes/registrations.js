@@ -580,7 +580,7 @@ router.post('/:id/generate-qr', authMiddleware, async (req, res) => {
 
     const currentCount = Number(reg.qrCount || 0);
     const allowance = Number(reg.qrAllowance || 0);
-    const maxAllowed = 2 + Math.max(0, allowance);
+    const maxAllowed = 100 + Math.max(0, allowance);
     if (currentCount >= maxAllowed) {
       await runAsync('INSERT INTO qr_logs (eventId, regId, userEmail, status, detail) VALUES (?,?,?,?,?)', [reg.eventId, reg.id, email, 'denied', 'limit_reached']);
       return res.status(429).json({ error: 'QR generation limit reached' });

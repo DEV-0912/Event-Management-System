@@ -7,7 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(() => ({
   server: {
     host: "::",
-    port: 3224,
+    port: 3000,
     allowedHosts: ["events.vjstartup.com"], // ✅ Added your domain here
     proxy: {
       "/api": {
